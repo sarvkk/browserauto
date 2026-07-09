@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ResizablePanel } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 import {
@@ -84,8 +85,9 @@ function Section({
 // Editor tab — edits the fields of the selected node.
 // ---------------------------------------------------------------------------
 
-// A single editor field for a node property.
-function FieldInput({
+// A single editor field for a node property. Renders a multi-line textarea when
+// the field opts in via `multiline`, otherwise a single-line input.
+function Field({
   field,
   value,
   onChange,
@@ -94,7 +96,17 @@ function FieldInput({
   value: string
   onChange: (value: string) => void
 }) {
-  // TODO: support a multiline field variant (textarea).
+  if (field.multiline) {
+    return (
+      <Textarea
+        id={field.key}
+        value={value}
+        placeholder={field.placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    )
+  }
+
   return (
     <Input
       id={field.key}
@@ -130,8 +142,9 @@ function Inspector({ node }: { node: StepNodeType | undefined }) {
             <div key={field.key} className="flex flex-col gap-1.5">
               <Label htmlFor={field.key} className="text-xs">
                 {field.label}
+                {field.required && <span className="text-destructive">*</span>}
               </Label>
-              <FieldInput
+              <Field
                 field={field}
                 value={values[field.key] ?? ""}
                 onChange={(value) => {
@@ -296,6 +309,11 @@ export function RightSidebar() {
   const selected = useStore((s) => s.nodes.find((n) => n.selected)) as StepNodeType | undefined
 
   // TODO: auto-switch to the Editor tab when the selection changes.
+  const [prevSelectedId, setPrevSelectedId] = useState(selected?.id)
+  if (selected && selected.id !== prevSelectedId) {
+    setPrevSelectedId(selected.id)
+    setTab("editor")
+  }
 
   return (
     <ResizablePanel
