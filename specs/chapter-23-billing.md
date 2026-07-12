@@ -13,8 +13,9 @@ foundation in one prompt, then each gate is a sentence.
 ## Prompt 1 — set up billing
 
 ```
-Set up billing for this app. It's organization-based, so turn on Clerk billing for
-organizations and add a "pro" plan that orgs can subscribe to.
+Using the clerk-billing skill, set up billing for this app. It's organization-based,
+so turn on Clerk billing for organizations and add a "pro" plan that orgs can
+subscribe to.
 
 Then build the upgrade surface: a pricing page in the app's dashboard route group, so
 it sits inside the dashboard layout, that shows the org plans and lets them subscribe
@@ -56,6 +57,8 @@ Enforce it in @features/workflows/actions.ts (createWorkflowAction) so it can't 
 bypassed, and on the "New workflow" button in
 @features/workflows/components/workflow-nav.tsx, where a non-pro org gets nudged to
 upgrade instead of creating. Reuse the pro-gate hook on the button.
+
+Use the clerk-billing skill for the server-side plan check.
 ```
 
 ---
