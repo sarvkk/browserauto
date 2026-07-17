@@ -6,7 +6,7 @@ import { SecretsManager } from "@/features/workflows/components/secrets-manager"
 
 export default async function SecretsPage() {
   const { orgId } = await auth()
-  if (!orgId) redirect("/")
+  if (!orgId) redirect("/home")
 
   const secrets = await listOrgSecretNames(orgId)
 

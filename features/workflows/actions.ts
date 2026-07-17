@@ -51,8 +51,8 @@ function normalizeWorkflowName(name: string) {
 }
 
 function revalidateWorkflowLayout() {
-  // The sidebar lives under the dashboard layout at `/`, not `/workflows`.
-  revalidatePath("/", "layout")
+  // Sidebar lives in the dashboard layout (e.g. /home, /workflows/*).
+  revalidatePath("/home", "layout")
 }
 
 export async function createWorkflowAction(name: string) {

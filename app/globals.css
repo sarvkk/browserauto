@@ -135,3 +135,187 @@
     cursor: pointer !important;
   }
 }
+
+/* Marketing landing */
+.landing {
+  --landing-paper: #e6edf4;
+  --landing-ink: #0c1222;
+  --landing-grid: #c8d3e0;
+  --landing-signal: #e23b14;
+  --landing-live: #2ec4a7;
+  --landing-chrome: #121925;
+  --font-landing: var(--font-landing-body), ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+.landing .font-display {
+  font-family: var(--font-landing-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+.landing.font-landing {
+  font-family: var(--font-landing);
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes landing-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes landing-scan {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-beam {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(280%);
+    opacity: 0;
+  }
+}
+
+@keyframes landing-progress {
+  0% {
+    width: 18%;
+  }
+  50% {
+    width: 68%;
+  }
+  100% {
+    width: 42%;
+  }
+}
+
+@keyframes landing-cursor-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(18px, 10px);
+  }
+}
+
+@keyframes landing-cursor-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-14px, -12px);
+  }
+}
+
+@keyframes landing-replay-playhead {
+  0% {
+    left: 8%;
+  }
+  100% {
+    left: 88%;
+  }
+}
+
+@keyframes landing-token-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--landing-signal) 18%, transparent);
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+.landing-pulse {
+  animation: landing-pulse 1.6s ease-in-out infinite;
+}
+
+.landing-scan {
+  animation: landing-scan 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-extract-beam {
+  animation: landing-beam 3.8s ease-in-out infinite;
+}
+
+.landing-progress {
+  animation: landing-progress 4.5s ease-in-out infinite;
+}
+
+.landing-cursor-a {
+  animation: landing-cursor-a 4.5s ease-in-out infinite;
+}
+
+.landing-cursor-b {
+  animation: landing-cursor-b 5.2s ease-in-out infinite;
+}
+
+.landing-replay-playhead {
+  animation: landing-replay-playhead 5s ease-in-out infinite alternate;
+}
+
+.landing-token {
+  animation: landing-token-glow 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-float,
+  .landing-pulse,
+  .landing-scan,
+  .landing-extract-beam,
+  .landing-progress,
+  .landing-cursor-a,
+  .landing-cursor-b,
+  .landing-replay-playhead,
+  .landing-token {
+    animation: none;
+  }
+}
