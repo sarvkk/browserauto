@@ -8,7 +8,7 @@ export type RunStep = {
   // the console can render a step without re-reading the graph.
   type: NodeType
   title: string
-  status: "pending" | "running" | "done" | "failed"
+  status: "pending" | "running" | "done" | "failed" | "skipped"
   // Wall-clock time the executor took, set once the step leaves "running".
   durationMs?: number
   // Whatever the executor returned, kept for the console's per-step detail view.

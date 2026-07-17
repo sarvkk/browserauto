@@ -95,7 +95,12 @@ function stepsForTriggerRun(run: TriggerWorkflowRun): RunStep[] {
 
 function sessionIdForTriggerRun(run: TriggerWorkflowRun): string | undefined {
   const output = run.output as RunWorkflowOutput | undefined
-  return output?.browserbaseSessionId
+  // Prefer output (final), then metadata (mid-run live view), so the console
+  // can open the live view as soon as the Browserbase session exists.
+  const metadataSessionId = run.metadata?.browserbaseSessionId as
+    | string
+    | undefined
+  return output?.browserbaseSessionId ?? metadataSessionId
 }
 
 // Map durable DB statuses onto the Trigger-shaped statuses the console already
@@ -154,7 +159,15 @@ function mergeRuns(
   }
 
   for (const run of realtimeRuns) {
-    byId.set(run.id, consoleRunFromTrigger(run))
+    const fromTrigger = consoleRunFromTrigger(run)
+    const existing = byId.get(run.id)
+    byId.set(run.id, {
+      ...fromTrigger,
+      // Keep a session id we already had from history if realtime hasn't
+      // published one yet (or lost it during a metadata race).
+      browserbaseSessionId:
+        fromTrigger.browserbaseSessionId ?? existing?.browserbaseSessionId,
+    })
   }
 
   return [...byId.values()].sort(

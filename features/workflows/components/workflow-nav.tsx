@@ -3,10 +3,11 @@
 import { useTransition } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MoreHorizontal, PlusIcon, WorkflowIcon } from "lucide-react"
+import { Lock, MoreHorizontal, PlusIcon, WorkflowIcon } from "lucide-react"
 
 import { generateSlug } from "@/features/workflows/lib/generate-slug"
 import { WorkflowActionsMenu } from "@/features/workflows/components/workflow-actions-menu"
+import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 import {
   Popover,
   PopoverContent,
@@ -35,8 +36,14 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
   const { state } = useSidebar()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
+  const { isLoaded, isPro, goToUpgrade } = useProPlan()
+  const locked = isLoaded && !isPro
 
   const handleCreateWorkflow = () => {
+    if (locked) {
+      goToUpgrade()
+      return
+    }
     startTransition(async () => {
       await onCreateWorkflow(generateSlug())
     })
@@ -84,8 +91,9 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
                       <SidebarMenuButton
                         onClick={handleCreateWorkflow}
                         disabled={isPending}
+                        title={locked ? "Upgrade to Pro to create workflows" : undefined}
                       >
-                        <PlusIcon />
+                        {locked ? <Lock /> : <PlusIcon />}
                         <span>New workflow</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -105,11 +113,11 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
     <SidebarGroup>
       <SidebarGroupLabel>Workflows</SidebarGroupLabel>
       <SidebarGroupAction
-        title="New workflow"
+        title={locked ? "Upgrade to Pro to create workflows" : "New workflow"}
         onClick={handleCreateWorkflow}
         disabled={isPending}
       >
-        <PlusIcon />
+        {locked ? <Lock /> : <PlusIcon />}
         <span className="sr-only">New workflow</span>
       </SidebarGroupAction>
       <SidebarGroupContent>

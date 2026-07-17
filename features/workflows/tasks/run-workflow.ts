@@ -1,6 +1,8 @@
 import toposort from "toposort"
 import { logger, metadata, task } from "@trigger.dev/sdk"
 import { Stagehand } from "@browserbasehq/stagehand"
+import type { Edge } from "@xyflow/react"
+
 import { nodeExecutors } from "@/features/workflows/nodes/node-executors"
 import {
   interpolate,
@@ -9,16 +11,13 @@ import {
 import type { RunStep } from "@/features/workflows/lib/run-types"
 import {
   finalizeWorkflowRun,
+  getDecryptedOrgSecrets,
   getWorkflow,
   upsertWorkflowRun,
 } from "@/features/workflows/data"
 
 export type { RunStep } from "@/features/workflows/lib/run-types"
 
-// The Trigger.dev task the Run button fires. It loads the saved graph, works out
-// what order the nodes should run in, and walks them. For now each node just
-// announces itself — real execution (per-node executors, live progress, browser
-// sessions) gets layered on from here.
 export const runWorkflowTask = task({
   id: "run-workflow",
   run: async (
@@ -32,22 +31,27 @@ export const runWorkflowTask = task({
     const { nodes, edges } = workflow.graph
     const byId = new Map(nodes.map((n) => [n.id, n]))
 
+    // Incoming edges keyed by target, used to decide whether a node should be
+    // skipped after a branch takes the other path.
+    const incomingByTarget = new Map<string, Edge[]>()
+    for (const edge of edges) {
+      const list = incomingByTarget.get(edge.target) ?? []
+      list.push(edge)
+      incomingByTarget.set(edge.target, list)
+    }
+
     // Run only connected nodes — anything touching an edge. Orphans dropped on
     // the canvas are skipped. toposort orders them and throws on a cycle.
     const connected = new Set(edges.flatMap((e) => [e.source, e.target]))
     const order = toposort
       .array(
         nodes.map((n) => n.id),
-        edges.map((e) => [e.source, e.target])
+        edges.map((e) => [e.source, e.target] as [string, string])
       )
       .filter((id) => connected.has(id))
 
     logger.log(`Running workflow ${workflow.name}`, { steps: order.length })
 
-    // Seed every step as "pending" up front and publish, so the canvas can render
-    // the full run as a list of spinners before any node starts. type and title
-    // are denormalized from the graph so the console can label each step without
-    // it. We mutate these entries in place and re-publish on every status change.
     const steps: RunStep[] = order.map((nodeId) => {
       const node = byId.get(nodeId)!
       return {
@@ -58,18 +62,9 @@ export const runWorkflowTask = task({
       }
     })
 
-    // The run owns one Browserbase session, opened lazily on the first browser step
-    // and reused by every later one, so the recording spans the whole flow. The
-    // LLM routes through Browserbase's Model Gateway (BROWSERBASE_API_KEY), so no
-    // separate provider key is needed.
     let stagehand: Stagehand | undefined
-    // The Browserbase session id, captured the moment the session opens so it can
-    // be returned in the run's output — a panel reads it there to fetch the replay
-    // once the run finishes and the recording is available.
     let browserbaseSessionId: string | undefined
 
-    // Persist a durable row up front so history survives even if the worker dies
-    // before Trigger returns an output.
     await upsertWorkflowRun({
       id: runId,
       workflowId,
@@ -78,10 +73,11 @@ export const runWorkflowTask = task({
       steps,
     })
 
-    // steps carries an arbitrary `output`, which is wider than trigger's
-    // metadata JSON type; values are JSON at runtime, so cast at this boundary.
     const publishSteps = async () => {
       metadata.set("steps", steps as never)
+      if (browserbaseSessionId) {
+        metadata.set("browserbaseSessionId", browserbaseSessionId)
+      }
       await upsertWorkflowRun({
         id: runId,
         workflowId,
@@ -100,20 +96,26 @@ export const runWorkflowTask = task({
         env: "BROWSERBASE",
         apiKey: process.env.BROWSERBASE_API_KEY!,
         model: "google/gemini-2.5-flash",
-        // Pino's logging backend spawns a thread-stream worker (lib/worker.js)
-        // that can't be resolved inside trigger.dev's bundled output. Disable it —
-        // the option exists for exactly these minimal/bundled environments.
         disablePino: true,
       })
       await stagehand.init()
       browserbaseSessionId = stagehand.browserbaseSessionID
+      await publishSteps()
+      await metadata.flush()
       return stagehand
     }
 
-    // Each node's result, keyed by its id, so later nodes can pull from it.
-    // Because we walk in dependency order, every id a node references is already
-    // populated by the time we run it.
-    const outputs: NodeOutputs = {}
+    // Inject org secrets as a pseudo-node so fields can use {{secrets.NAME}}.
+    // Never publish secret values to metadata or step outputs.
+    const secretValues = await getDecryptedOrgSecrets(orgId)
+    const outputs: NodeOutputs = {
+      secrets: secretValues,
+    }
+
+    // Track which nodes were skipped / which branch handle was taken so
+    // downstream nodes on the inactive path can be skipped.
+    const skipped = new Set<string>()
+    const takenHandle = new Map<string, string>()
 
     for (let i = 0; i < order.length; i++) {
       const id = order[i]
@@ -121,9 +123,28 @@ export const runWorkflowTask = task({
       const node = byId.get(id)!
       logger.log(`Running step: ${node.data.title}`)
 
-      // A node with no executor (the start trigger) does no work and produces no
-      // output — mark it done rather than leaving it "pending", which reads as
-      // skipped forever in the console.
+      // Skip if every incoming edge is inactive (source skipped, or branch took
+      // the other handle). Nodes with no incoming edges (e.g. Start) always run.
+      const incoming = incomingByTarget.get(id) ?? []
+      if (incoming.length > 0) {
+        const anyActive = incoming.some((edge) => {
+          if (skipped.has(edge.source)) return false
+          const taken = takenHandle.get(edge.source)
+          if (taken != null && edge.sourceHandle != null) {
+            return edge.sourceHandle === taken
+          }
+          // Source had no branching (or edges without handles) — edge is active
+          // as long as the source wasn't skipped.
+          return true
+        })
+        if (!anyActive) {
+          skipped.add(id)
+          step.status = "skipped"
+          await publishSteps()
+          continue
+        }
+      }
+
       const executor = nodeExecutors[node.data.type]
       if (!executor) {
         step.status = "done"
@@ -131,14 +152,10 @@ export const runWorkflowTask = task({
         continue
       }
 
-      // Mark running before the executor and flush immediately: the "done" set
-      // below happens before the SDK's next background flush, so without forcing
-      // it here the "running" state is overwritten and the canvas never spins.
       step.status = "running"
       await publishSteps()
       await metadata.flush()
 
-      // Swap {{ nodeId.path }} placeholders for upstream output before running.
       const values = Object.fromEntries(
         Object.entries(node.data.values).map(([key, text]) => [
           key,
@@ -146,17 +163,27 @@ export const runWorkflowTask = task({
         ])
       )
 
-      // Time the executor so the console can show how long the step took, on
-      // both the success and failure paths.
       const startedAt = Date.now()
       try {
-        const output = await executor({ values, getStagehand })
+        const output = await executor({
+          values,
+          getStagehand,
+          runId,
+          orgId,
+        })
         outputs[id] = output
         step.output = output
+
+        // Record which branch handle was taken for skip logic downstream.
+        if (
+          node.data.type === "branch" &&
+          output &&
+          typeof output === "object" &&
+          "branch" in output
+        ) {
+          takenHandle.set(id, String((output as { branch: string }).branch))
+        }
       } catch (error) {
-        // Flush the "failed" state before the throw unwinds the run: a thrown run
-        // returns no output, so this flushed metadata is the only way the canvas
-        // ever learns which node failed — and the only place its error survives.
         const message = error instanceof Error ? error.message : String(error)
         step.status = "failed"
         step.durationMs = Date.now() - startedAt

@@ -1,29 +1,47 @@
 import type { Node } from "@xyflow/react"
 import {
   Bot,
+  Camera,
   Eye,
+  GitBranch,
   Globe,
+  Hourglass,
   Mail,
+  MessageSquare,
   MousePointerClick,
   Pointer,
   ScanText,
+  Send,
   type LucideIcon,
 } from "lucide-react"
 
 export type StepNodeKind = "trigger" | "action"
 
-// One editable field on a node, rendered as an input in the inspector later.
+export type NodeFieldOption = {
+  value: string
+  label: string
+}
+
+// One editable field on a node, rendered in the inspector.
 export type NodeField = {
   key: string
   label: string
   placeholder?: string
   // Render as a multi-line textarea instead of a single-line input.
   multiline?: boolean
+  // Render as a select with the given options.
+  kind?: "text" | "select"
+  options?: NodeFieldOption[]
   required?: boolean
 }
 
 export type NodeOutput = {
   path: string
+  label: string
+}
+
+export type SourceHandleDef = {
+  id: string
   label: string
 }
 
@@ -36,6 +54,9 @@ export type NodeDefinition = {
   accent: string // Tailwind classes for the icon chip color
   fields: NodeField[]
   outputs: NodeOutput[]
+  // When set, the step node renders multiple labeled source handles instead of
+  // the default single unlabeled one (used by branch).
+  sourceHandles?: SourceHandleDef[]
 }
 
 export const nodeRegistry = {
@@ -96,6 +117,12 @@ export const nodeRegistry = {
         placeholder: "Extract the product price",
         multiline: true,
         required: true,
+      },
+      {
+        key: "schema",
+        label: "Schema (optional JSON)",
+        placeholder: '{ "price": "string", "items": ["string"] }',
+        multiline: true,
       },
     ],
     outputs: [{ path: "extraction", label: "Extraction" }],
@@ -161,11 +188,148 @@ export const nodeRegistry = {
     ],
     outputs: [{ path: "id", label: "Email ID" }],
   },
+  branch: {
+    type: "branch",
+    kind: "action",
+    label: "Branch",
+    icon: GitBranch,
+    accent: "bg-orange-500 text-white",
+    fields: [
+      {
+        key: "left",
+        label: "Left value",
+        placeholder: "{{ node.extraction }}",
+        required: true,
+      },
+      {
+        key: "operator",
+        label: "Operator",
+        kind: "select",
+        options: [
+          { value: "equals", label: "Equals" },
+          { value: "not_equals", label: "Not equals" },
+          { value: "contains", label: "Contains" },
+          { value: "greater_than", label: "Greater than" },
+          { value: "less_than", label: "Less than" },
+          { value: "is_empty", label: "Is empty" },
+        ],
+        required: true,
+      },
+      {
+        key: "right",
+        label: "Right value",
+        placeholder: "expected value",
+      },
+    ],
+    outputs: [
+      { path: "result", label: "Result" },
+      { path: "branch", label: "Branch" },
+    ],
+    sourceHandles: [
+      { id: "true", label: "True" },
+      { id: "false", label: "False" },
+    ],
+  },
+  wait: {
+    type: "wait",
+    kind: "action",
+    label: "Wait",
+    icon: Hourglass,
+    accent: "bg-stone-500 text-white",
+    fields: [
+      {
+        key: "seconds",
+        label: "Seconds",
+        placeholder: "5",
+        required: true,
+      },
+    ],
+    outputs: [{ path: "seconds", label: "Seconds" }],
+  },
+  "http-request": {
+    type: "http-request",
+    kind: "action",
+    label: "HTTP Request",
+    icon: Send,
+    accent: "bg-indigo-500 text-white",
+    fields: [
+      {
+        key: "url",
+        label: "URL",
+        placeholder: "https://api.example.com/data",
+        required: true,
+      },
+      {
+        key: "method",
+        label: "Method",
+        kind: "select",
+        options: [
+          { value: "GET", label: "GET" },
+          { value: "POST", label: "POST" },
+          { value: "PUT", label: "PUT" },
+          { value: "PATCH", label: "PATCH" },
+          { value: "DELETE", label: "DELETE" },
+        ],
+        required: true,
+      },
+      {
+        key: "headers",
+        label: "Headers (JSON)",
+        placeholder: '{ "Authorization": "Bearer {{ secrets.API_KEY }}" }',
+        multiline: true,
+      },
+      {
+        key: "body",
+        label: "Body",
+        placeholder: '{ "hello": "world" }',
+        multiline: true,
+      },
+    ],
+    outputs: [
+      { path: "status", label: "Status" },
+      { path: "body", label: "Body" },
+    ],
+  },
+  slack: {
+    type: "slack",
+    kind: "action",
+    label: "Slack",
+    icon: MessageSquare,
+    accent: "bg-fuchsia-500 text-white",
+    fields: [
+      {
+        key: "webhookUrl",
+        label: "Webhook URL",
+        placeholder: "{{ secrets.SLACK_WEBHOOK_URL }}",
+        required: true,
+      },
+      {
+        key: "message",
+        label: "Message",
+        placeholder: "Workflow finished",
+        multiline: true,
+        required: true,
+      },
+    ],
+    outputs: [{ path: "ok", label: "OK" }],
+  },
+  screenshot: {
+    type: "screenshot",
+    kind: "action",
+    label: "Screenshot",
+    icon: Camera,
+    accent: "bg-cyan-500 text-white",
+    fields: [],
+    outputs: [
+      { path: "url", label: "URL" },
+      { path: "artifactId", label: "Artifact ID" },
+    ],
+  },
 } satisfies Record<string, NodeDefinition>
 
 export type NodeType = keyof typeof nodeRegistry
 
-// Plain JSON only (synced through Liveblocks later). type keys into the registry;
+// Plain JSON only (synced through Liveblocks). type keys into the registry;
 // kind and title are denormalized so the server can read them without the registry.
 export type StepNodeData = {
   type: NodeType

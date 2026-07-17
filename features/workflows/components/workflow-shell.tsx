@@ -7,22 +7,29 @@ import {
 import { Canvas } from "./canvas"
 import { ConsolePanel } from "./console-panel"
 import { RightSidebar } from "./right-sidebar"
+import type { WorkflowGraph } from "@/lib/db/schema"
 
 interface WorkflowShellProps {
   workflowId: string
   workflowName: string
+  initialGraph?: WorkflowGraph | null
+  scheduleCron: string | null
+  webhookSecret: string | null
 }
 
 export function WorkflowShell({
   workflowId,
   workflowName,
+  initialGraph,
+  scheduleCron,
+  webhookSecret,
 }: WorkflowShellProps) {
   return (
     <ResizablePanelGroup orientation="horizontal" className="size-full">
       <ResizablePanel minSize="30rem">
         <ResizablePanelGroup orientation="vertical">
           <ResizablePanel minSize="18rem">
-            <Canvas />
+            <Canvas initialGraph={initialGraph} />
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel defaultSize="8rem" minSize="6rem">
@@ -32,7 +39,12 @@ export function WorkflowShell({
       </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel defaultSize="16rem" minSize="14rem" maxSize="36rem">
-        <RightSidebar workflowId={workflowId} workflowName={workflowName} />
+        <RightSidebar
+          workflowId={workflowId}
+          workflowName={workflowName}
+          scheduleCron={scheduleCron}
+          webhookSecret={webhookSecret}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   )

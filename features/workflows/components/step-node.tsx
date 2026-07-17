@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react"
 
 import {
   nodeRegistry,
+  type NodeDefinition,
   type StepNodeType,
 } from "@/features/workflows/nodes/node-registry"
 import { useLatestRunSteps } from "@/features/workflows/components/workflow-runs-provider"
@@ -11,27 +12,26 @@ import { cn } from "@/lib/utils"
 
 function StepNodeComponent({ id, data, selected }: NodeProps<StepNodeType>) {
   const { type, kind, title, values } = data
-  const def = nodeRegistry[type]
+  const def = nodeRegistry[type] as NodeDefinition
   const Icon = def.icon
   const fields = def.fields.filter((field) => values[field.key])
+  const sourceHandles = def.sourceHandles
 
-  // Reflect this node's state in the latest run. A node is only "running" while
-  // the run is actually live — once it ends, a node left marked running stops
-  // spinning rather than hanging forever.
   const { steps, isLive } = useLatestRunSteps()
   const status = steps.find((step) => step.nodeId === id)?.status
   const isRunning = status === "running" && isLive
   const isFailed = status === "failed"
+  const isSkipped = status === "skipped"
 
-  // A trigger starts the flow and takes no input, so it has no target handle.
   const hasTarget = kind !== "trigger"
 
   return (
     <div
       className={cn(
-        "min-w-50 max-w-80 rounded-(--radius) border-2 border-border bg-card text-card-foreground",
+        "relative min-w-50 max-w-80 rounded-(--radius) border-2 border-border bg-card text-card-foreground",
         isRunning && "border-blue-500",
         isFailed && "border-destructive",
+        isSkipped && "opacity-50",
         selected && "ring-2 ring-ring ring-offset-2 ring-offset-background"
       )}
     >
@@ -54,6 +54,11 @@ function StepNodeComponent({ id, data, selected }: NodeProps<StepNodeType>) {
           {isRunning ? <Spinner className="size-4" /> : <Icon className="size-4" />}
         </div>
         <span className="text-sm font-semibold">{title}</span>
+        {isSkipped && (
+          <span className="ml-auto text-[10px] uppercase text-muted-foreground">
+            skipped
+          </span>
+        )}
       </div>
 
       {fields.length > 0 && (
@@ -73,12 +78,37 @@ function StepNodeComponent({ id, data, selected }: NodeProps<StepNodeType>) {
         </>
       )}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ transform: "translate(100%, -50%)" }}
-        className="h-3.5! w-1.5! min-w-0! rounded-l-none! rounded-r-xs! border-0! bg-border!"
-      />
+      {sourceHandles && sourceHandles.length > 0 ? (
+        sourceHandles.map((handle, index) => {
+          const topPercent =
+            ((index + 1) / (sourceHandles.length + 1)) * 100
+          return (
+            <Handle
+              key={handle.id}
+              id={handle.id}
+              type="source"
+              position={Position.Right}
+              style={{
+                top: `${topPercent}%`,
+                transform: "translate(100%, -50%)",
+              }}
+              className="h-3.5! w-1.5! min-w-0! rounded-l-none! rounded-r-xs! border-0! bg-border!"
+              title={handle.label}
+            >
+              <span className="pointer-events-none absolute top-1/2 left-full ml-1.5 -translate-y-1/2 text-[10px] whitespace-nowrap text-muted-foreground">
+                {handle.label}
+              </span>
+            </Handle>
+          )
+        })
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{ transform: "translate(100%, -50%)" }}
+          className="h-3.5! w-1.5! min-w-0! rounded-l-none! rounded-r-xs! border-0! bg-border!"
+        />
+      )}
     </div>
   )
 }

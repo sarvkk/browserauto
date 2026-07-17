@@ -22,8 +22,6 @@ export default async function Page({
   if (!workflow) notFound()
 
   const [runsToken, storedRuns] = await Promise.all([
-    // A read-only token scoped to this workflow's run tag, so the client can
-    // subscribe to its runs in realtime. Good for ~an hour of an open canvas.
     triggerAuth.createPublicToken({
       scopes: {
         read: {
@@ -35,13 +33,6 @@ export default async function Page({
     listWorkflowRuns(orgId, id),
   ])
 
-  // Ensure the Liveblocks room exists. Entry is granted by the access-token auth
-  // endpoint after verifying the workflow belongs to the active Clerk org — room
-  // groupsAccesses are not the access control path anymore.
-  //
-  // Rooms created with a Liveblocks organizationId cannot be joined by tokens
-  // without one. Recreate those into the default org (Flow storage is lost;
-  // Postgres still has the last graph saved on run).
   const room = await getLiveblocks().upsertRoom(id, {
     update: {
       metadata: { title: workflow.name },
@@ -60,7 +51,6 @@ export default async function Page({
     })
   }
 
-  // Serialize dates for the client boundary; the provider rehydrates them.
   const initialRuns = storedRuns.map((run) => ({
     id: run.id,
     status: run.status,
@@ -70,8 +60,6 @@ export default async function Page({
     error: run.error,
   }))
 
-  // The canvas and the sidebar's node palette live in separate components, so a
-  // single ReactFlowProvider wraps both to give them one shared React Flow store.
   return (
     <Room roomId={id}>
       <ReactFlowProvider>
@@ -80,7 +68,13 @@ export default async function Page({
           accessToken={runsToken}
           initialRuns={initialRuns}
         >
-          <WorkflowShell workflowId={id} workflowName={workflow.name} />
+          <WorkflowShell
+            workflowId={id}
+            workflowName={workflow.name}
+            initialGraph={workflow.graph}
+            scheduleCron={workflow.scheduleCron}
+            webhookSecret={workflow.webhookSecret}
+          />
         </WorkflowRunsProvider>
       </ReactFlowProvider>
     </Room>

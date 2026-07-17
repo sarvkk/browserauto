@@ -3,8 +3,13 @@ import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   WorkflowGraph,
+  orgSecrets,
+  runArtifacts,
   workflowRuns,
   workflows,
+  type OrgSecret,
+  type RunArtifact,
+  type Workflow,
   type WorkflowRunInsert,
   type WorkflowRunRecord,
 } from "@/lib/db/schema"
@@ -13,6 +18,7 @@ import type {
   WorkflowRunStatus,
 } from "@/features/workflows/lib/run-types"
 import { validateGraph } from "@/features/workflows/lib/validate-graph"
+import { decryptSecret, encryptSecret } from "@/lib/crypto"
 
 const WORKFLOW_RUN_HISTORY_LIMIT = 50
 
@@ -50,10 +56,25 @@ export async function getWorkflow(orgId: string, id: string) {
   return workflow
 }
 
-export async function createWorkflow(orgId: string, name: string) {
+// Lookup by id alone — used by scheduled/webhook triggers that already trust
+// the external schedule or shared secret.
+export async function getWorkflowById(id: string) {
+  const [workflow] = await db
+    .select()
+    .from(workflows)
+    .where(eq(workflows.id, id))
+
+  return workflow
+}
+
+export async function createWorkflow(
+  orgId: string,
+  name: string,
+  graph?: WorkflowGraph | null
+) {
   const [workflow] = await db
     .insert(workflows)
-    .values({ orgId, name })
+    .values({ orgId, name, graph: graph ?? null })
     .returning()
 
   return workflow
@@ -80,6 +101,48 @@ export async function renameWorkflow({
 export async function deleteWorkflow(orgId: string, id: string) {
   const [workflow] = await db
     .delete(workflows)
+    .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
+    .returning()
+
+  return workflow
+}
+
+export async function updateWorkflowSchedule({
+  orgId,
+  id,
+  scheduleId,
+  scheduleCron,
+}: {
+  orgId: string
+  id: string
+  scheduleId: string | null
+  scheduleCron: string | null
+}): Promise<Workflow | undefined> {
+  const [workflow] = await db
+    .update(workflows)
+    .set({
+      scheduleId,
+      scheduleCron,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
+    .returning()
+
+  return workflow
+}
+
+export async function updateWorkflowWebhookSecret({
+  orgId,
+  id,
+  webhookSecret,
+}: {
+  orgId: string
+  id: string
+  webhookSecret: string | null
+}): Promise<Workflow | undefined> {
+  const [workflow] = await db
+    .update(workflows)
+    .set({ webhookSecret, updatedAt: new Date() })
     .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
     .returning()
 
@@ -114,6 +177,15 @@ export async function getWorkflowRunBySession(
       )
     )
     .limit(1)
+
+  return run
+}
+
+export async function getWorkflowRun(orgId: string, runId: string) {
+  const [run] = await db
+    .select()
+    .from(workflowRuns)
+    .where(and(eq(workflowRuns.id, runId), eq(workflowRuns.orgId, orgId)))
 
   return run
 }
@@ -226,4 +298,133 @@ export async function markWorkflowRunCanceled(orgId: string, runId: string) {
     .returning()
 
   return run
+}
+
+// ---------------------------------------------------------------------------
+// Org secrets — list returns names only; values stay encrypted until run time.
+// ---------------------------------------------------------------------------
+
+export async function listOrgSecretNames(orgId: string) {
+  return db
+    .select({
+      id: orgSecrets.id,
+      name: orgSecrets.name,
+      createdAt: orgSecrets.createdAt,
+      updatedAt: orgSecrets.updatedAt,
+    })
+    .from(orgSecrets)
+    .where(eq(orgSecrets.orgId, orgId))
+    .orderBy(orgSecrets.name)
+}
+
+export async function createOrgSecret({
+  orgId,
+  name,
+  value,
+}: {
+  orgId: string
+  name: string
+  value: string
+}): Promise<Pick<OrgSecret, "id" | "name" | "createdAt" | "updatedAt">> {
+  const [secret] = await db
+    .insert(orgSecrets)
+    .values({
+      orgId,
+      name,
+      encryptedValue: encryptSecret(value),
+    })
+    .returning({
+      id: orgSecrets.id,
+      name: orgSecrets.name,
+      createdAt: orgSecrets.createdAt,
+      updatedAt: orgSecrets.updatedAt,
+    })
+
+  return secret
+}
+
+export async function updateOrgSecret({
+  orgId,
+  id,
+  value,
+}: {
+  orgId: string
+  id: string
+  value: string
+}) {
+  const [secret] = await db
+    .update(orgSecrets)
+    .set({
+      encryptedValue: encryptSecret(value),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(orgSecrets.id, id), eq(orgSecrets.orgId, orgId)))
+    .returning({
+      id: orgSecrets.id,
+      name: orgSecrets.name,
+      createdAt: orgSecrets.createdAt,
+      updatedAt: orgSecrets.updatedAt,
+    })
+
+  return secret
+}
+
+export async function deleteOrgSecret(orgId: string, id: string) {
+  const [secret] = await db
+    .delete(orgSecrets)
+    .where(and(eq(orgSecrets.id, id), eq(orgSecrets.orgId, orgId)))
+    .returning({ id: orgSecrets.id, name: orgSecrets.name })
+
+  return secret
+}
+
+// Decrypt every secret for an org into a plain name→value map for interpolation.
+export async function getDecryptedOrgSecrets(
+  orgId: string
+): Promise<Record<string, string>> {
+  const rows = await db
+    .select({
+      name: orgSecrets.name,
+      encryptedValue: orgSecrets.encryptedValue,
+    })
+    .from(orgSecrets)
+    .where(eq(orgSecrets.orgId, orgId))
+
+  const result: Record<string, string> = {}
+  for (const row of rows) {
+    result[row.name] = decryptSecret(row.encryptedValue)
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Run artifacts (screenshots, etc.)
+// ---------------------------------------------------------------------------
+
+export async function createRunArtifact({
+  runId,
+  orgId,
+  contentType,
+  data,
+}: {
+  runId: string
+  orgId: string
+  contentType: string
+  data: Buffer
+}): Promise<RunArtifact> {
+  const [artifact] = await db
+    .insert(runArtifacts)
+    .values({ runId, orgId, contentType, data })
+    .returning()
+
+  return artifact
+}
+
+export async function getRunArtifact(orgId: string, id: string) {
+  const [artifact] = await db
+    .select()
+    .from(runArtifacts)
+    .where(and(eq(runArtifacts.id, id), eq(runArtifacts.orgId, orgId)))
+
+  return artifact
 }
