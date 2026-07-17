@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { Copy, Lock, Play, Square } from "lucide-react"
+import { Copy, Play, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -36,7 +36,6 @@ import {
 import { NodeIcon } from "@/features/workflows/components/node-icon"
 import { WorkflowActionsMenu } from "@/features/workflows/components/workflow-actions-menu"
 import { useLiveRun } from "@/features/workflows/components/workflow-runs-provider"
-import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 import { useUpstreamConnections } from "@/features/workflows/hooks/use-upstream-connections"
 import { validateGraph } from "@/features/workflows/lib/validate-graph"
 import {
@@ -401,23 +400,13 @@ const sections: { kind: StepNodeKind; label: string }[] = [
 ]
 
 const definitions = Object.values(nodeRegistry)
-const premiumNodes = new Set<NodeType>(["agent"])
 
 function Palette() {
   const { getNodes, getViewport, addNodes } = useReactFlow<StepNodeType>()
   const width = useStore((s) => s.width)
   const height = useStore((s) => s.height)
-  const { isLoaded, isPro, goToUpgrade } = useProPlan()
-
-  const isLocked = (type: NodeType) =>
-    premiumNodes.has(type) && isLoaded && !isPro
 
   const add = (type: NodeType) => {
-    if (isLocked(type)) {
-      goToUpgrade()
-      return
-    }
-
     const def = nodeRegistry[type] as NodeDefinition
     const nodes = getNodes()
 
@@ -471,20 +460,15 @@ function Palette() {
                 .filter((def) => def.kind === section.kind)
                 .map((def) => {
                   const type = def.type as NodeType
-                  const locked = isLocked(type)
                   return (
                     <Button
                       key={def.type}
                       variant="ghost"
                       onClick={() => add(type)}
-                      title={locked ? "Upgrade to Pro to add this node" : undefined}
                       className="justify-start gap-2.5 px-1.5 text-xs"
                     >
                       <NodeIcon type={type} />
                       {def.label}
-                      {locked && (
-                        <Lock className="ml-auto size-3.5 text-muted-foreground" />
-                      )}
                     </Button>
                   )
                 })}

@@ -1,20 +1,12 @@
-import { PricingTable } from "@clerk/nextjs"
-
 export default function BillingPage() {
   return (
-    <div className="h-svh overflow-y-auto">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground text-sm">
-            Choose a plan for your organization. Upgrades and checkout happen
-            right here.
-          </p>
-        </div>
-        <PricingTable
-          for="organization"
-          newSubscriptionRedirectUrl="/billing"
-        />
+    <div className="flex h-svh items-center justify-center p-8">
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Everything is free for now. All nodes, live view, and session replay
+          are available to every organization.
+        </p>
       </div>
     </div>
   )

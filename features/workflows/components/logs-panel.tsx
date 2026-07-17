@@ -5,7 +5,6 @@ import prettyMilliseconds from "pretty-ms"
 import {
   Download,
   Eye,
-  Lock,
   MonitorPlay,
   RotateCcw,
 } from "lucide-react"
@@ -16,7 +15,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 import { NodeIcon } from "@/features/workflows/components/node-icon"
-import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 import {
   useConsoleRuns,
   type ConsoleRun,
@@ -92,16 +90,10 @@ function ReplayRow({
   isSelected: boolean
   onSelect: (selection: ReplaySelection) => void
 }) {
-  const { isLoaded, isPro, goToUpgrade } = useProPlan()
-  const isLocked = isLoaded && !isPro
-
   return (
     <button
       type="button"
-      onClick={() =>
-        isLocked ? goToUpgrade() : onSelect({ kind: "replay", runId: run.id })
-      }
-      title={isLocked ? "Upgrade to Pro to watch replays" : undefined}
+      onClick={() => onSelect({ kind: "replay", runId: run.id })}
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-accent",
         isSelected && "bg-accent"
@@ -111,9 +103,6 @@ function ReplayRow({
         <MonitorPlay className="size-3.5" />
       </span>
       <span className="truncate font-medium">Replay</span>
-      {isLocked && (
-        <Lock className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
-      )}
     </button>
   )
 }
@@ -127,16 +116,10 @@ function LiveViewRow({
   isSelected: boolean
   onSelect: (selection: LiveSelection) => void
 }) {
-  const { isLoaded, isPro, goToUpgrade } = useProPlan()
-  const isLocked = isLoaded && !isPro
-
   return (
     <button
       type="button"
-      onClick={() =>
-        isLocked ? goToUpgrade() : onSelect({ kind: "live", runId: run.id })
-      }
-      title={isLocked ? "Upgrade to Pro to watch live view" : undefined}
+      onClick={() => onSelect({ kind: "live", runId: run.id })}
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-accent",
         isSelected && "bg-accent"
@@ -146,9 +129,6 @@ function LiveViewRow({
         <Eye className="size-3.5" />
       </span>
       <span className="truncate font-medium">Live view</span>
-      {isLocked && (
-        <Lock className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
-      )}
     </button>
   )
 }

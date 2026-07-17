@@ -56,15 +56,10 @@ function revalidateWorkflowLayout() {
 }
 
 export async function createWorkflowAction(name: string) {
-  const { orgId, has } = await auth()
+  const { orgId } = await auth()
 
   if (!orgId) {
     throw new Error("No active organization")
-  }
-
-  // Creating workflows is a Pro feature (spec chapter-23 Prompt 4).
-  if (!has({ plan: "pro" })) {
-    throw new Error("Creating workflows requires the Pro plan.")
   }
 
   Sentry.getIsolationScope().setAttributes({ action: "createWorkflowAction", orgId })
@@ -80,14 +75,10 @@ export async function createWorkflowAction(name: string) {
 export async function createWorkflowFromTemplateAction(
   templateId: WorkflowTemplateId
 ) {
-  const { orgId, has } = await auth()
+  const { orgId } = await auth()
 
   if (!orgId) {
     throw new Error("No active organization")
-  }
-
-  if (!has({ plan: "pro" })) {
-    throw new Error("Creating workflows requires the Pro plan.")
   }
 
   const template = WORKFLOW_TEMPLATES.find((t) => t.id === templateId)
@@ -233,29 +224,17 @@ export async function runWorkflowAction({
   id: string
   graph: WorkflowGraph
 }) {
-  const { orgId, has } = await auth()
+  const { orgId } = await auth()
 
   if (!orgId) {
     throw new Error("No active organization")
   }
 
-  // The Agent node is Pro-only. Enforce it here rather than in the run task: the
-  // action holds the Clerk session (and has()), while the Trigger.dev task runs
-  // with no auth context. has() evaluates the active org, confirmed above.
   Sentry.getIsolationScope().setAttributes({
     action: "runWorkflowAction",
     orgId,
     workflowId: id,
   })
-
-  const hasAgentNode = graph.nodes.some((node) => node.data.type === "agent")
-  if (hasAgentNode && !has({ plan: "pro" })) {
-    Sentry.logger.warn("Workflow run denied — Agent node requires Pro plan", {
-      workflowId: id,
-      orgId,
-    })
-    throw new Error("The Agent node requires the Pro plan.")
-  }
 
   try {
     await saveWorkflowGraph({ orgId, id, graph })
@@ -278,26 +257,18 @@ export async function runWorkflowAction({
     orgId,
     runId: handle.id,
     nodeCount: graph.nodes.length,
-    hasAgentNode,
   })
 
   return handle
 }
 
 export async function retryWorkflowRunAction(workflowId: string) {
-  const { orgId, has } = await auth()
+  const { orgId } = await auth()
   if (!orgId) throw new Error("No active organization")
 
   const workflow = await getWorkflow(orgId, workflowId)
   if (!workflow?.graph) {
     throw new Error("Workflow has no saved graph to retry.")
-  }
-
-  const hasAgentNode = workflow.graph.nodes.some(
-    (node) => node.data.type === "agent"
-  )
-  if (hasAgentNode && !has({ plan: "pro" })) {
-    throw new Error("The Agent node requires the Pro plan.")
   }
 
   const handle = await tasks.trigger<typeof runWorkflowTask>(

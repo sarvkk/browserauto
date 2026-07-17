@@ -1,9 +1,8 @@
 "use client"
 
 import { useTransition } from "react"
-import { Lock, Mail, GitBranch, ScanText } from "lucide-react"
+import { Mail, GitBranch, ScanText } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import {
   Empty,
   EmptyContent,
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/empty"
 import { NewWorkflowButton } from "@/features/workflows/components/new-workflow-button"
 import { createWorkflowFromTemplateAction } from "@/features/workflows/actions"
-import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 import type { WorkflowTemplateId } from "@/features/workflows/templates"
 
 const templates: {
@@ -55,18 +53,12 @@ function TemplateCard({
   icon: React.ReactNode
 }) {
   const [isPending, startTransition] = useTransition()
-  const { isLoaded, isPro, goToUpgrade } = useProPlan()
-  const locked = isLoaded && !isPro
 
   return (
     <button
       type="button"
       disabled={isPending}
       onClick={() => {
-        if (locked) {
-          goToUpgrade()
-          return
-        }
         startTransition(async () => {
           await createWorkflowFromTemplateAction(id)
         })
@@ -78,7 +70,6 @@ function TemplateCard({
           {icon}
         </span>
         <span className="font-semibold">{title}</span>
-        {locked && <Lock className="ml-auto size-3.5 text-muted-foreground" />}
       </div>
       <p className="text-sm text-muted-foreground">{description}</p>
     </button>
@@ -105,14 +96,9 @@ export default function Page() {
       </Empty>
 
       <div className="w-full max-w-3xl">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-            Templates
-          </h2>
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/billing">Plans</a>
-          </Button>
-        </div>
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+          Templates
+        </h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {templates.map((template) => (
             <TemplateCard key={template.id} {...template} />

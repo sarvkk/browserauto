@@ -11,7 +11,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { userId, orgId, has } = await auth()
+  const { userId, orgId } = await auth()
   if (!userId || !orgId) {
     return new Response("Unauthorized", { status: 401 })
   }
@@ -24,16 +24,6 @@ export async function GET(
     orgId,
     sessionId,
   })
-
-  // Live view is a Pro feature (same as session replay). Gate it here so a
-  // non-pro org can't pull a debug URL by calling the route directly.
-  if (!has({ plan: "pro" })) {
-    Sentry.logger.warn("Live view denied — Pro plan required", {
-      orgId,
-      sessionId,
-    })
-    return new Response("Pro plan required", { status: 403 })
-  }
 
   // Tenancy: only serve live views for sessions this org actually ran.
   const ownedRun = await getWorkflowRunBySession(orgId, sessionId)

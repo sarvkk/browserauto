@@ -2,7 +2,7 @@ import * as React from "react"
 import Link from "next/link"
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
-import { CreditCard, KeyRound } from "lucide-react"
+import { KeyRound } from "lucide-react"
 
 import {
   Sidebar,
@@ -56,14 +56,6 @@ export async function AppSidebar({
                   <Link href="/secrets">
                     <KeyRound />
                     <span>Secrets</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Billing">
-                  <Link href="/billing">
-                    <CreditCard />
-                    <span>Billing</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
