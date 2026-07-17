@@ -35,26 +35,30 @@ export default async function Page({
     listWorkflowRuns(orgId, id),
   ])
 
-  // Upsert so an existing room also picks up the latest Postgres name. Rooms are
-  // private by default under ID-token auth; grant write access to the owning org,
-  // matching the `groupIds: [orgId]` issued by the auth endpoint.
-  await getLiveblocks().upsertRoom(id, {
+  // Ensure the Liveblocks room exists. Entry is granted by the access-token auth
+  // endpoint after verifying the workflow belongs to the active Clerk org — room
+  // groupsAccesses are not the access control path anymore.
+  //
+  // Rooms created with a Liveblocks organizationId cannot be joined by tokens
+  // without one. Recreate those into the default org (Flow storage is lost;
+  // Postgres still has the last graph saved on run).
+  const room = await getLiveblocks().upsertRoom(id, {
     update: {
-      metadata: {
-        title: workflow.name,
-      },
+      metadata: { title: workflow.name },
     },
     create: {
-      organizationId: orgId,
       defaultAccesses: [],
-      groupsAccesses: {
-        [orgId]: ["room:write"],
-      },
-      metadata: {
-        title: workflow.name,
-      },
+      metadata: { title: workflow.name },
     },
   })
+
+  if (room.organizationId !== "default") {
+    await getLiveblocks().deleteRoom(id)
+    await getLiveblocks().createRoom(id, {
+      defaultAccesses: [],
+      metadata: { title: workflow.name },
+    })
+  }
 
   // Serialize dates for the client boundary; the provider rehydrates them.
   const initialRuns = storedRuns.map((run) => ({

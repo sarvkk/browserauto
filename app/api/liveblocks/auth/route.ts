@@ -1,55 +1,83 @@
 import * as Sentry from "@sentry/nextjs"
 import { auth, currentUser } from "@clerk/nextjs/server"
 
+import { getWorkflow } from "@/features/workflows/data"
 import { getLiveblocks } from "@/lib/liveblocks"
 
-export async function POST() {
+function forbidden(reason: string) {
+  return Response.json({ error: "forbidden", reason }, { status: 403 })
+}
+
+export async function POST(request: Request) {
   const { userId, orgId } = await auth()
 
   if (!userId || !orgId) {
-    return new Response("Unauthorized", { status: 401 })
+    return forbidden("Unauthorized")
   }
 
   const user = await currentUser()
 
   if (!user) {
-    return new Response("Unauthorized", { status: 401 })
+    return forbidden("Unauthorized")
+  }
+
+  const { room } = (await request.json().catch(() => ({}))) as {
+    room?: string
   }
 
   Sentry.getIsolationScope().setAttributes({
     route: "POST /api/liveblocks/auth",
     userId,
     orgId,
+    roomId: room,
   })
 
-  // Identify the user with an ID token. Permissions are resolved per-room
-  // from the user's groups — scope access to their Clerk organization.
-  const { status, body } = await getLiveblocks().identifyUser(
-    {
-      userId,
-      groupIds: [orgId],
-      organizationId: orgId,
+  // Access tokens put permissions in the token itself, so we don't depend on
+  // room groupsAccesses / Liveblocks organizationId matching. Still verify the
+  // workflow belongs to the active Clerk org before granting entry.
+  if (room) {
+    const workflow = await getWorkflow(orgId, room)
+    if (!workflow) {
+      Sentry.logger.warn("Liveblocks auth denied — workflow not in org", {
+        userId,
+        orgId,
+        roomId: room,
+      })
+      return forbidden("No access to this room")
+    }
+  }
+
+  const session = getLiveblocks().prepareSession(userId, {
+    userInfo: {
+      name:
+        user.fullName ??
+        user.username ??
+        user.primaryEmailAddress?.emailAddress ??
+        "Anonymous",
+      avatar: user.imageUrl,
     },
-    {
-      userInfo: {
-        name:
-          user.fullName ??
-          user.username ??
-          user.primaryEmailAddress?.emailAddress ??
-          "Anonymous",
-        avatar: user.imageUrl,
-      },
-    },
-  )
+  })
+
+  if (room) {
+    session.allow(room, session.FULL_ACCESS)
+  }
+
+  const { status, body } = await session.authorize()
 
   if (status >= 400) {
-    Sentry.logger.error("Liveblocks user identification failed", {
+    Sentry.logger.error("Liveblocks session authorize failed", {
       userId,
       orgId,
+      roomId: room,
       status,
     })
   } else {
-    Sentry.logger.info("Liveblocks user identified", { userId, orgId, status })
+    Sentry.logger.info("Liveblocks session authorized", {
+      userId,
+      orgId,
+      roomId: room,
+      status,
+    })
   }
 
   return new Response(body, { status })

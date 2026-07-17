@@ -18,7 +18,14 @@ export function Room({
   return (
     <LiveblocksProvider
       throttle={16}
-      authEndpoint="/api/liveblocks/auth"
+      authEndpoint={async (room) => {
+        const response = await fetch("/api/liveblocks/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ room }),
+        })
+        return await response.json()
+      }}
       resolveUsers={async ({ userIds }) => {
         try {
           const response = await fetch("/api/liveblocks/users", {
