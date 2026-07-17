@@ -4,6 +4,8 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/opengraph-image(.*)",
+  "/twitter-image(.*)",
   "/api/workflows/(.*)/trigger",
   "/api/playground",
 ])

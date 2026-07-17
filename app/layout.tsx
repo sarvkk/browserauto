@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs"
 import { shadcn } from "@clerk/ui/themes"
+import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "@clerk/ui/themes/shadcn.css"
@@ -15,6 +16,36 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://browserauto.sarvajit.com.np"
+
+const siteTitle = "Browserauto — Visual browser automation"
+const siteDescription =
+  "Build AI-powered browser workflows on a canvas. Act, extract, branch, and notify — then watch every run live."
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteTitle,
+    template: "%s · Browserauto",
+  },
+  description: siteDescription,
+  applicationName: "Browserauto",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: "Browserauto",
+    title: siteTitle,
+    description: siteDescription,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
+}
 
 export default function RootLayout({
   children,

@@ -21,6 +21,19 @@ export const metadata: Metadata = {
   title: "Browserauto — Visual browser automation",
   description:
     "Build AI-powered browser workflows on a canvas. Act, extract, branch, and notify — then watch every run live.",
+  openGraph: {
+    title: "Browserauto — Visual browser automation",
+    description:
+      "Visual workflows that drive real browsers. Compose AI act, extract, and branch steps — then run them in the cloud.",
+    url: "/",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Browserauto — Visual browser automation",
+    description:
+      "Visual workflows that drive real browsers. Compose AI act, extract, and branch steps — then run them in the cloud.",
+  },
 }
 
 export default async function Page() {
