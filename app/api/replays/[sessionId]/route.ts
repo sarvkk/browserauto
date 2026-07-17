@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server"
 import { NotFoundError } from "@browserbasehq/sdk"
 
 import { browserbase } from "@/lib/browserbase"
+import { getWorkflowRunBySession } from "@/features/workflows/data"
 
 // Proxies a Browserbase session's replay so the browser can play it back. The
 // retrieval needs the secret API key, so it can only happen server-side — the
@@ -41,6 +42,17 @@ export async function GET(
     return new Response("Pro plan required", { status: 403 })
   }
 
+  // Tenancy: only serve replays for sessions this org actually ran. Unknown or
+  // foreign session ids 404 the same way so we don't leak Browserbase existence.
+  const ownedRun = await getWorkflowRunBySession(orgId, sessionId)
+  if (!ownedRun) {
+    Sentry.logger.warn("Session replay denied — session not owned by org", {
+      orgId,
+      sessionId,
+    })
+    return new Response("Not found", { status: 404 })
+  }
+
   try {
     // Page metadata for the replay: one entry per page the session visited, each
     // with its own HLS playlist. While the recording is still processing this
@@ -62,6 +74,8 @@ export async function GET(
     Sentry.logger.info("Session replay served", {
       sessionId,
       orgId,
+      workflowId: ownedRun.workflowId,
+      runId: ownedRun.id,
       pageCount: replay.pages.length,
     })
 

@@ -1,21 +1,35 @@
-# Next.js template
+# Browserauto
 
-This is a Next.js template with shadcn/ui.
+## Trigger.dev setup
 
-## Adding components
+Most of Trigger.dev is already wired into this repo:
 
-To add components to your app, run the following command:
+- `trigger.config.ts` points at project `proj_ntfnxpyhigpgyqvfkoso`
+- task files live under `features/`
+- app code already triggers the `run-workflow` task
+- `.env.example` and `.env.local` include `TRIGGER_SECRET_KEY`
+
+The remaining local setup is:
 
 ```bash
-npx shadcn@latest add button
+npx trigger.dev@latest login
 ```
 
-This will place the ui components in the `components` directory.
+Then copy your Trigger.dev DEV secret key from the dashboard API Keys page into:
 
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+.env.local
 ```
+
+```bash
+TRIGGER_SECRET_KEY=tr_dev_...
+```
+
+Start the app and the Trigger.dev worker in separate terminals:
+
+```bash
+pnpm dev
+pnpm trigger:dev
+```
+
+Once both are running, Trigger.dev should register the tasks from `features/` in the dashboard.

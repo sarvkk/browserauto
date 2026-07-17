@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { Lock, MoreHorizontal, Play, Square, Trash2 } from "lucide-react"
+import { Lock, Play, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -12,12 +12,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ResizablePanel } from "@/components/ui/resizable"
@@ -26,10 +20,10 @@ import { Textarea } from "@/components/ui/textarea"
 
 import {
   cancelWorkflowRunAction,
-  deleteWorkflowAction,
   runWorkflowAction,
 } from "@/features/workflows/actions"
 import { NodeIcon } from "@/features/workflows/components/node-icon"
+import { WorkflowActionsMenu } from "@/features/workflows/components/workflow-actions-menu"
 import { useLiveRun } from "@/features/workflows/components/workflow-runs-provider"
 import { useProPlan } from "@/features/workflows/hooks/use-pro-plan"
 import { useUpstreamConnections } from "@/features/workflows/hooks/use-upstream-connections"
@@ -320,40 +314,6 @@ function Palette() {
 // Header — workflow-level actions shown above the tabs.
 // ---------------------------------------------------------------------------
 
-// The "..." menu for workflow-level actions.
-function ActionsMenu({ workflowId }: { workflowId: string }) {
-  const [isPending, startTransition] = useTransition()
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost">
-          <MoreHorizontal />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-48">
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={(e) => {
-            // Keep the menu mounted while the delete runs so the disabled state
-            // stays visible. Running inside a transition lets the router handle
-            // the action's redirect home on success.
-            e.preventDefault()
-            startTransition(async () => {
-              await deleteWorkflowAction(workflowId)
-            })
-          }}
-        >
-          <Trash2 />
-          Delete workflow
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 // Toggles between running the current workflow and stopping the run in flight.
 // While a run is live it becomes a Stop button that cancels that run; otherwise
 // it validates the graph and kicks off a new run.
@@ -414,7 +374,13 @@ function RunButton({ workflowId }: { workflowId: string }) {
 // The sidebar itself — header on top, then the Toolbar / Editor tabs.
 // ---------------------------------------------------------------------------
 
-export function RightSidebar({ workflowId }: { workflowId: string }) {
+export function RightSidebar({
+  workflowId,
+  workflowName,
+}: {
+  workflowId: string
+  workflowName: string
+}) {
   const [tab, setTab] = useState("toolbar")
 
   // TODO: read the currently selected node from React Flow.
@@ -437,7 +403,10 @@ export function RightSidebar({ workflowId }: { workflowId: string }) {
     >
       <Tabs value={tab} onValueChange={setTab} className="size-full gap-0">
         <div className="flex items-center justify-between border-b border-border p-2">
-          <ActionsMenu workflowId={workflowId} />
+          <WorkflowActionsMenu
+            workflowId={workflowId}
+            workflowName={workflowName}
+          />
           <RunButton workflowId={workflowId} />
         </div>
         <TabsList className="m-2 w-fit bg-background">

@@ -1,4 +1,4 @@
-import { resend } from "@/lib/resend"
+import { getResend } from "@/lib/resend"
 
 export async function sendEmail({
   to,
@@ -9,6 +9,8 @@ export async function sendEmail({
   subject: string
   body: string
 }) {
+  const resend = getResend()
+
   const { data, error } = await resend.emails.send({
     from: "onboarding@resend.dev",
     to,

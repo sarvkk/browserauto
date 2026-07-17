@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@10.33.1",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +11,8 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "trigger:dev": "trigger dev",
+    "trigger:deploy": "trigger deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -75,6 +78,12 @@
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
+    "trigger.dev": "4.5.3",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@trigger.dev/core": "4.5.3"
+    }
   }
 }

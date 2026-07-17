@@ -3,9 +3,10 @@
 import { useTransition } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { PlusIcon, WorkflowIcon } from "lucide-react"
+import { MoreHorizontal, PlusIcon, WorkflowIcon } from "lucide-react"
 
 import { generateSlug } from "@/features/workflows/lib/generate-slug"
+import { WorkflowActionsMenu } from "@/features/workflows/components/workflow-actions-menu"
 import {
   Popover,
   PopoverContent,
@@ -17,6 +18,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
@@ -50,6 +52,16 @@ export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
           <span>{workflow.name}</span>
         </Link>
       </SidebarMenuButton>
+      <WorkflowActionsMenu
+        workflowId={workflow.id}
+        workflowName={workflow.name}
+        align="end"
+        trigger={
+          <SidebarMenuAction showOnHover aria-label={`Actions for ${workflow.name}`}>
+            <MoreHorizontal />
+          </SidebarMenuAction>
+        }
+      />
     </SidebarMenuItem>
   ))
 

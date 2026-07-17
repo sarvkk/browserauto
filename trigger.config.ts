@@ -3,7 +3,7 @@ import { esbuildPlugin } from "@trigger.dev/build/extensions";
 import sentryEsbuildPlugin from "@sentry/esbuild-plugin";
 
 export default defineConfig({
-  project: "proj_ntfnxpyhigpgyqvfkoso",
+  project: "proj_ejrpgbrrletjbsaiksgw",
   runtime: "node",
   logLevel: "log",
   // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.
