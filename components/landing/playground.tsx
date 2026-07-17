@@ -436,8 +436,8 @@ export function Playground() {
             ) : null}
             {selected === "email" ? (
               <p className="mt-2 text-[11px] leading-relaxed text-(--landing-ink)/45">
-                Without RESEND_API_KEY you still get a full preview. With Resend
-                sandbox, delivery usually only works to your own inbox.
+                Digests send from your verified Resend domain. Without
+                RESEND_API_KEY you still get a full preview.
               </p>
             ) : null}
           </div>

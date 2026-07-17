@@ -10,9 +10,12 @@ export async function sendEmail({
   body: string
 }) {
   const resend = getResend()
+  const from =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "Browserauto <workflows@sarvajit.com.np>"
 
   const { data, error } = await resend.emails.send({
-    from: "onboarding@resend.dev",
+    from,
     to,
     subject,
     html: body,

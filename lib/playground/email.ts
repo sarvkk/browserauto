@@ -176,15 +176,19 @@ export async function sendPlaygroundEmail(
       sent: false,
       preview,
       message:
-        "Email preview ready. Set RESEND_API_KEY to deliver for real (Resend sandbox can only send to your own address).",
+        "Email preview ready. Set RESEND_API_KEY to deliver for real.",
     }
   }
+
+  const from =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "Browserauto Playground <playground@sarvajit.com.np>"
 
   try {
     const resend = getResend()
     const { data, error } = await resend.emails.send(
       {
-        from: "Browserauto Playground <onboarding@resend.dev>",
+        from,
         to,
         subject,
         html,
@@ -200,7 +204,7 @@ export async function sendPlaygroundEmail(
         preview,
         message:
           error?.message ??
-          "Resend could not send. Showing preview instead (sandbox often only allows your own inbox).",
+          "Resend could not send. Showing preview instead.",
       }
     }
 
