@@ -1,11 +1,19 @@
 import { ImageResponse } from "next/og"
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 
 export const alt = "Browserauto — Visual browser automation"
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
 // Shared link-preview card for Messenger, Slack, iMessage, X, etc.
-export default function OpenGraphImage() {
+export default async function OpenGraphImage() {
+  const logoSvg = await readFile(
+    join(process.cwd(), "app/icon.svg"),
+    "utf8"
+  )
+  const logoDataUrl = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}`
+
   return new ImageResponse(
     (
       <div
@@ -24,29 +32,21 @@ export default function OpenGraphImage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 16,
+            gap: 18,
             color: "#1a1814",
             fontSize: 28,
             fontWeight: 600,
             letterSpacing: "-0.02em",
           }}
         >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: "#1a1814",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#f4f0e8",
-              fontSize: 22,
-              fontWeight: 700,
-            }}
-          >
-            B
-          </div>
+          {/* Favicon mark */}
+          <img
+            src={logoDataUrl}
+            width={56}
+            height={56}
+            alt=""
+            style={{ borderRadius: 14 }}
+          />
           Browserauto
         </div>
 

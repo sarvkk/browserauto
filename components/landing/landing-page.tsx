@@ -10,6 +10,7 @@ import {
   Webhook,
 } from "lucide-react"
 
+import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { HeroIllustration } from "@/components/landing/hero-illustration"
 import { Playground } from "@/components/landing/playground"
 
@@ -17,11 +18,8 @@ export function LandingPage() {
   return (
     <div className="min-h-svh bg-(--landing-paper) text-(--landing-ink)">
       <header className="landing-rise relative z-30 flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-        <Link
-          href="/"
-          className="font-display text-xl font-semibold tracking-tight"
-        >
-          Browserauto
+        <Link href="/" className="transition-opacity hover:opacity-90">
+          <BrandMark />
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           <a
@@ -55,12 +53,15 @@ export function LandingPage() {
         {/* Hero — one composition */}
         <section className="relative flex min-h-[calc(100svh-4.5rem)] flex-col">
           <div className="relative z-20 mx-auto w-full max-w-6xl px-5 pt-6 sm:px-8 sm:pt-10 lg:px-12">
-            <p
-              className="landing-rise font-display text-5xl leading-[0.95] font-semibold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl"
+            <div
+              className="landing-rise flex items-center gap-4 sm:gap-5"
               style={{ animationDelay: "0.05s" }}
             >
-              Browserauto
-            </p>
+              <BrandLogo className="size-14 sm:size-16 md:size-20" />
+              <p className="font-display text-5xl leading-[0.95] font-semibold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+                Browserauto
+              </p>
+            </div>
             <h1
               className="landing-rise mt-5 max-w-xl font-display text-2xl leading-snug font-medium tracking-tight text-(--landing-ink)/85 sm:text-3xl"
               style={{ animationDelay: "0.12s" }}
@@ -422,7 +423,7 @@ export function LandingPage() {
 
       <footer className="border-t border-(--landing-ink)/10 px-5 py-8 sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-display text-sm font-semibold">Browserauto</span>
+          <BrandMark />
           <p className="text-xs text-(--landing-ink)/45">
             Browser automation for teams who think in workflows.
           </p>

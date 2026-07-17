@@ -4,6 +4,7 @@ import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
 import { KeyRound, Shield } from "lucide-react"
 
+import { BrandLogo } from "@/components/brand-logo"
 import {
   Sidebar,
   SidebarContent,
@@ -29,6 +30,13 @@ export async function AppSidebar({
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
       <SidebarHeader className="flex-row items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+        <Link
+          href="/home"
+          className="hidden shrink-0 group-data-[collapsible=icon]:flex"
+          aria-label="Browserauto home"
+        >
+          <BrandLogo className="size-7" />
+        </Link>
         <OrganizationSwitcher
           afterCreateOrganizationUrl="/home"
           afterSelectOrganizationUrl="/home"
