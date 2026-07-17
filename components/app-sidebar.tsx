@@ -2,7 +2,7 @@ import * as React from "react"
 import Link from "next/link"
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
-import { KeyRound } from "lucide-react"
+import { KeyRound, Shield } from "lucide-react"
 
 import {
   Sidebar,
@@ -51,6 +51,14 @@ export async function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Auth profiles">
+                  <Link href="/auth-profiles">
+                    <Shield />
+                    <span>Auth profiles</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Secrets">
                   <Link href="/secrets">

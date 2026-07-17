@@ -6,7 +6,8 @@ import { getWorkflowById } from "@/features/workflows/data"
 
 // Public webhook trigger for a workflow. Auth is the shared secret stored on
 // the workflow row (x-webhook-secret header), not Clerk — so external systems
-// can fire a run without a user session.
+// can fire a run without a user session. JSON body is available as
+// {{ trigger.body }} inside the workflow.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -37,9 +38,32 @@ export async function POST(
     })
   }
 
+  let body: unknown
+  const contentType = request.headers.get("content-type") ?? ""
+  if (contentType.includes("application/json")) {
+    try {
+      body = await request.json()
+    } catch {
+      return new Response("Invalid JSON body", { status: 400 })
+    }
+  } else {
+    const text = await request.text()
+    if (text.trim()) {
+      try {
+        body = JSON.parse(text) as unknown
+      } catch {
+        body = text
+      }
+    }
+  }
+
   const handle = await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",
-    { workflowId: workflow.id, orgId: workflow.orgId },
+    {
+      workflowId: workflow.id,
+      orgId: workflow.orgId,
+      trigger: { source: "webhook", body },
+    },
     { tags: [`workflow:${workflow.id}`] }
   )
 

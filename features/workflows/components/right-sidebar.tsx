@@ -31,6 +31,7 @@ import {
   disableWorkflowScheduleAction,
   runWorkflowAction,
   setWebhookEnabledAction,
+  setWorkflowAuthProfileAction,
   setWorkflowScheduleAction,
 } from "@/features/workflows/actions"
 import { NodeIcon } from "@/features/workflows/components/node-icon"
@@ -121,19 +122,32 @@ function Field({
   )
 }
 
+const AUTH_PROFILE_NONE = "__none__"
+const AUTH_PROFILE_DEFAULT = "__default__"
+
+type AuthProfileOption = {
+  id: string
+  name: string
+}
+
 function TriggersPanel({
   workflowId,
   scheduleCron,
   webhookSecret,
+  authProfileId,
+  authProfiles,
 }: {
   workflowId: string
   scheduleCron: string | null
   webhookSecret: string | null
+  authProfileId: string | null
+  authProfiles: AuthProfileOption[]
 }) {
   const { getNodes, getEdges } = useReactFlow<StepNodeType>()
   const [cron, setCron] = useState(scheduleCron ?? "0 9 * * *")
   const [localWebhookSecret, setLocalWebhookSecret] = useState(webhookSecret)
   const [localScheduleCron, setLocalScheduleCron] = useState(scheduleCron)
+  const [localAuthProfileId, setLocalAuthProfileId] = useState(authProfileId)
   const [isPending, startTransition] = useTransition()
   const webhookEnabled = Boolean(localWebhookSecret)
   const webhookUrl =
@@ -154,20 +168,118 @@ function TriggersPanel({
     setPrevWebhookSecret(webhookSecret)
     setLocalWebhookSecret(webhookSecret)
   }
+  const [prevAuthProfileId, setPrevAuthProfileId] = useState(authProfileId)
+  if (authProfileId !== prevAuthProfileId) {
+    setPrevAuthProfileId(authProfileId)
+    setLocalAuthProfileId(authProfileId)
+  }
 
   return (
     <div className="flex flex-col gap-4 border-t border-border p-3">
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs font-semibold">Schedule (cron)</Label>
-        <p className="text-[11px] text-muted-foreground">
-          Saves the current graph and attaches a Trigger.dev schedule.
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs font-semibold">Auth profile</Label>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Default logged-in Browserbase context for this workflow (schedules and
+          webhooks). Create profiles under Auth profiles, then pick one here.
         </p>
+        <Select
+          value={localAuthProfileId ?? AUTH_PROFILE_NONE}
+          disabled={isPending}
+          onValueChange={(value) => {
+            const next = value === AUTH_PROFILE_NONE ? null : value
+            startTransition(async () => {
+              try {
+                const result = await setWorkflowAuthProfileAction({
+                  id: workflowId,
+                  authProfileId: next,
+                })
+                setLocalAuthProfileId(result.authProfileId)
+                toast.success(
+                  next ? "Auth profile saved" : "Auth profile cleared"
+                )
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Couldn't save auth profile"
+                )
+              }
+            })
+          }}
+        >
+          <SelectTrigger className="w-full text-xs">
+            <SelectValue placeholder="None" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={AUTH_PROFILE_NONE}>None</SelectItem>
+            {authProfiles.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                {profile.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs font-semibold">Schedule (cron)</Label>
+        <div className="space-y-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <p>
+            Automatically runs this workflow on a timer — same as pressing{" "}
+            <span className="font-medium text-foreground">Run</span>, but
+            without you being here.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Enable schedule</span>{" "}
+            saves the current canvas and registers the cron with Trigger.dev.
+            Runs show up in the bottom runs panel when they fire.
+          </p>
+          <p>
+            Format:{" "}
+            <code className="rounded bg-muted px-1 font-mono text-[10px]">
+              minute hour day month weekday
+            </code>{" "}
+            (UTC). Example{" "}
+            <code className="rounded bg-muted px-1 font-mono text-[10px]">
+              0 9 * * *
+            </code>{" "}
+            = every day at 09:00 UTC.
+          </p>
+        </div>
         <Input
           value={cron}
           onChange={(e) => setCron(e.target.value)}
           placeholder="0 9 * * *"
           className="font-mono text-xs"
+          aria-describedby="cron-help"
         />
+        <p id="cron-help" className="text-[10px] text-muted-foreground">
+          Common:{" "}
+          <button
+            type="button"
+            className="font-mono underline-offset-2 hover:underline"
+            onClick={() => setCron("0 9 * * *")}
+          >
+            0 9 * * *
+          </button>{" "}
+          daily ·{" "}
+          <button
+            type="button"
+            className="font-mono underline-offset-2 hover:underline"
+            onClick={() => setCron("0 */6 * * *")}
+          >
+            0 */6 * * *
+          </button>{" "}
+          every 6h ·{" "}
+          <button
+            type="button"
+            className="font-mono underline-offset-2 hover:underline"
+            onClick={() => setCron("0 9 * * 1-5")}
+          >
+            0 9 * * 1-5
+          </button>{" "}
+          weekdays
+        </p>
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -225,6 +337,8 @@ function TriggersPanel({
         {localScheduleCron && (
           <p className="text-[11px] text-muted-foreground">
             Active: <span className="font-mono">{localScheduleCron}</span>
+            {" · "}
+            next runs appear below when Trigger fires this workflow.
           </p>
         )}
       </div>
@@ -253,12 +367,20 @@ function TriggersPanel({
             }}
           />
         </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Let another app start this workflow with a POST. Turn on the switch to
+          get a URL and secret — send{" "}
+          <code className="rounded bg-muted px-1">x-webhook-secret</code> as a
+          header. JSON body fields are available as{" "}
+          <code className="rounded bg-muted px-1">{"{{ trigger.body }}"}</code>{" "}
+          (and nested paths like{" "}
+          <code className="rounded bg-muted px-1">
+            {"{{ trigger.body.url }}"}
+          </code>
+          ).
+        </p>
         {webhookEnabled && localWebhookSecret && (
           <>
-            <p className="text-[11px] text-muted-foreground">
-              POST with header{" "}
-              <code className="rounded bg-muted px-1">x-webhook-secret</code>
-            </p>
             <div className="flex gap-1">
               <Input
                 readOnly
@@ -305,11 +427,15 @@ function Inspector({
   workflowId,
   scheduleCron,
   webhookSecret,
+  authProfileId,
+  authProfiles,
 }: {
   node: StepNodeType | undefined
   workflowId: string
   scheduleCron: string | null
   webhookSecret: string | null
+  authProfileId: string | null
+  authProfiles: AuthProfileOption[]
 }) {
   const { updateNodeData } = useReactFlow<StepNodeType>()
   const connections = useUpstreamConnections()
@@ -388,6 +514,8 @@ function Inspector({
           workflowId={workflowId}
           scheduleCron={scheduleCron}
           webhookSecret={webhookSecret}
+          authProfileId={authProfileId}
+          authProfiles={authProfiles}
         />
       )}
     </Section>
@@ -427,7 +555,12 @@ function Palette() {
     const defaultValues: Record<string, string> = {}
     for (const field of def.fields) {
       if (field.kind === "select" && field.options?.[0]) {
-        defaultValues[field.key] = field.options[0].value
+        // Prefer a sensible self-heal default for act/extract.
+        if (field.key === "retries") {
+          defaultValues[field.key] = "2"
+        } else {
+          defaultValues[field.key] = field.options[0].value
+        }
       }
     }
 
@@ -480,7 +613,23 @@ function Palette() {
   )
 }
 
-function RunButton({ workflowId }: { workflowId: string }) {
+function resolveRunAuthProfileId(
+  override: string
+): string | null | undefined {
+  if (override === AUTH_PROFILE_DEFAULT) return undefined
+  if (override === AUTH_PROFILE_NONE) return null
+  return override
+}
+
+function RunButton({
+  workflowId,
+  triggerBody,
+  authProfileOverride,
+}: {
+  workflowId: string
+  triggerBody: string
+  authProfileOverride: string
+}) {
   const { getNodes, getEdges } = useReactFlow<StepNodeType>()
   const [isPending, startTransition] = useTransition()
   const liveRun = useLiveRun()
@@ -521,7 +670,18 @@ function RunButton({ workflowId }: { workflowId: string }) {
         }
 
         startTransition(async () => {
-          await runWorkflowAction({ id: workflowId, graph })
+          try {
+            await runWorkflowAction({
+              id: workflowId,
+              graph,
+              triggerBody,
+              authProfileId: resolveRunAuthProfileId(authProfileOverride),
+            })
+          } catch (error) {
+            toast.error(
+              error instanceof Error ? error.message : "Couldn't start the run."
+            )
+          }
         })
       }}
     >
@@ -536,13 +696,20 @@ export function RightSidebar({
   workflowName,
   scheduleCron,
   webhookSecret,
+  authProfileId,
+  authProfiles,
 }: {
   workflowId: string
   workflowName: string
   scheduleCron: string | null
   webhookSecret: string | null
+  authProfileId: string | null
+  authProfiles: AuthProfileOption[]
 }) {
   const [tab, setTab] = useState("toolbar")
+  const [triggerBody, setTriggerBody] = useState("")
+  const [authProfileOverride, setAuthProfileOverride] =
+    useState(AUTH_PROFILE_DEFAULT)
   const selected = useStore((s) =>
     s.nodes.find((n) => n.selected)
   ) as StepNodeType | undefined
@@ -552,6 +719,9 @@ export function RightSidebar({
     setPrevSelectedId(selected.id)
     setTab("editor")
   }
+
+  const defaultProfileName =
+    authProfiles.find((p) => p.id === authProfileId)?.name ?? "None"
 
   return (
     <ResizablePanel
@@ -567,7 +737,65 @@ export function RightSidebar({
             workflowId={workflowId}
             workflowName={workflowName}
           />
-          <RunButton workflowId={workflowId} />
+          <RunButton
+            workflowId={workflowId}
+            triggerBody={triggerBody}
+            authProfileOverride={authProfileOverride}
+          />
+        </div>
+        <div className="space-y-2 border-b border-border px-2 py-2">
+          <div>
+            <Label
+              htmlFor="run-auth-profile"
+              className="text-[11px] font-medium"
+            >
+              Auth profile (this run)
+            </Label>
+            <Select
+              value={authProfileOverride}
+              onValueChange={setAuthProfileOverride}
+            >
+              <SelectTrigger
+                id="run-auth-profile"
+                className="mt-1.5 w-full text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={AUTH_PROFILE_DEFAULT}>
+                  Workflow default ({defaultProfileName})
+                </SelectItem>
+                <SelectItem value={AUTH_PROFILE_NONE}>None</SelectItem>
+                {authProfiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label
+              htmlFor="run-trigger-body"
+              className="text-[11px] font-medium"
+            >
+              Run input (JSON)
+            </Label>
+            <Textarea
+              id="run-trigger-body"
+              value={triggerBody}
+              onChange={(e) => setTriggerBody(e.target.value)}
+              placeholder='{ "url": "https://example.com" }'
+              className="mt-1.5 min-h-14 font-mono text-[11px]"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Optional. Available as{" "}
+              <code className="rounded bg-muted px-1">
+                {"{{ trigger.body }}"}
+              </code>{" "}
+              when you press Run.
+            </p>
+          </div>
         </div>
         <TabsList className="m-2 w-fit bg-background">
           <TabsTrigger
@@ -593,6 +821,8 @@ export function RightSidebar({
             workflowId={workflowId}
             scheduleCron={scheduleCron}
             webhookSecret={webhookSecret}
+            authProfileId={authProfileId}
+            authProfiles={authProfiles}
           />
         </TabsContent>
       </Tabs>

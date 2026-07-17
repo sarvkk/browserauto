@@ -15,6 +15,8 @@ interface WorkflowShellProps {
   initialGraph?: WorkflowGraph | null
   scheduleCron: string | null
   webhookSecret: string | null
+  authProfileId: string | null
+  authProfiles: { id: string; name: string }[]
 }
 
 export function WorkflowShell({
@@ -23,6 +25,8 @@ export function WorkflowShell({
   initialGraph,
   scheduleCron,
   webhookSecret,
+  authProfileId,
+  authProfiles,
 }: WorkflowShellProps) {
   return (
     <ResizablePanelGroup orientation="horizontal" className="size-full">
@@ -44,6 +48,8 @@ export function WorkflowShell({
           workflowName={workflowName}
           scheduleCron={scheduleCron}
           webhookSecret={webhookSecret}
+          authProfileId={authProfileId}
+          authProfiles={authProfiles}
         />
       </ResizablePanel>
     </ResizablePanelGroup>

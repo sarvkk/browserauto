@@ -9,6 +9,7 @@ import { redirect } from "next/navigation"
 
 import type { runWorkflowTask } from "@/features/workflows/tasks/run-workflow"
 import type { runWorkflowScheduledTask } from "@/features/workflows/tasks/run-workflow-scheduled"
+import type { RunTrigger } from "@/features/workflows/lib/trigger-payload"
 
 import { getLiveblocks } from "@/lib/liveblocks"
 import {
@@ -22,9 +23,21 @@ import {
   renameWorkflow,
   saveWorkflowGraph,
   updateOrgSecret,
+  updateWorkflowAuthProfile,
   updateWorkflowSchedule,
   updateWorkflowWebhookSecret,
+  createAuthProfile,
+  deleteAuthProfile,
+  getAuthProfile,
+  listAuthProfiles,
+  setAuthProfileLoginSession,
 } from "@/features/workflows/data"
+import {
+  createAuthLoginSession,
+  createBrowserbaseContext,
+  deleteBrowserbaseContext,
+  releaseBrowserbaseSession,
+} from "@/lib/auth-profiles"
 import {
   WORKFLOW_TEMPLATES,
   type WorkflowTemplateId,
@@ -217,12 +230,28 @@ export async function deleteWorkflowAction(id: string) {
   return { id }
 }
 
+function parseManualTriggerBody(raw: string | undefined): unknown {
+  const trimmed = raw?.trim()
+  if (!trimmed) return undefined
+  try {
+    return JSON.parse(trimmed) as unknown
+  } catch {
+    throw new Error("Run input must be valid JSON.")
+  }
+}
+
 export async function runWorkflowAction({
   id,
   graph,
+  triggerBody,
+  authProfileId,
 }: {
   id: string
   graph: WorkflowGraph
+  // Optional JSON string from the Run panel → {{ trigger.body }}
+  triggerBody?: string
+  // Manual override. Omit to use the workflow default; null = none for this run.
+  authProfileId?: string | null
 }) {
   const { orgId } = await auth()
 
@@ -246,9 +275,19 @@ export async function runWorkflowAction({
     throw error
   }
 
+  if (authProfileId) {
+    const profile = await getAuthProfile(orgId, authProfileId)
+    if (!profile) throw new Error("Auth profile not found")
+  }
+
+  const trigger: RunTrigger = {
+    source: "manual",
+    body: parseManualTriggerBody(triggerBody),
+  }
+
   const handle = await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",
-    { workflowId: id, orgId },
+    { workflowId: id, orgId, trigger, authProfileId },
     { tags: [`workflow:${id}`] }
   )
 
@@ -257,6 +296,7 @@ export async function runWorkflowAction({
     orgId,
     runId: handle.id,
     nodeCount: graph.nodes.length,
+    authProfileId: authProfileId ?? "workflow-default",
   })
 
   return handle
@@ -273,7 +313,11 @@ export async function retryWorkflowRunAction(workflowId: string) {
 
   const handle = await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",
-    { workflowId, orgId },
+    {
+      workflowId,
+      orgId,
+      trigger: { source: "manual" },
+    },
     { tags: [`workflow:${workflowId}`] }
   )
 
@@ -471,4 +515,154 @@ export async function deleteSecretAction(id: string) {
 
   revalidatePath("/secrets")
   return secret
+}
+
+// ---------------------------------------------------------------------------
+// Auth profiles
+// ---------------------------------------------------------------------------
+
+export async function listAuthProfilesAction() {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+  return listAuthProfiles(orgId)
+}
+
+export async function createAuthProfileAction({ name }: { name: string }) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error("Profile name can't be empty.")
+  if (trimmed.length > 80) {
+    throw new Error("Profile name must be 80 characters or fewer.")
+  }
+
+  const existing = await listAuthProfiles(orgId)
+  if (existing.some((p) => p.name.toLowerCase() === trimmed.toLowerCase())) {
+    throw new Error("A profile with that name already exists.")
+  }
+
+  const context = await createBrowserbaseContext()
+  try {
+    const profile = await createAuthProfile({
+      orgId,
+      name: trimmed,
+      browserbaseContextId: context.id,
+    })
+    revalidatePath("/auth-profiles")
+    return profile
+  } catch (error) {
+    await deleteBrowserbaseContext(context.id).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function startAuthProfileLoginAction(id: string) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  const profile = await getAuthProfile(orgId, id)
+  if (!profile) throw new Error("Auth profile not found")
+
+  if (profile.activeLoginSessionId) {
+    await releaseBrowserbaseSession(profile.activeLoginSessionId)
+  }
+
+  const session = await createAuthLoginSession(profile.browserbaseContextId)
+  await setAuthProfileLoginSession({
+    orgId,
+    id,
+    activeLoginSessionId: session.id,
+  })
+
+  return { sessionId: session.id, profileId: id }
+}
+
+export async function finishAuthProfileLoginAction(id: string) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  const profile = await getAuthProfile(orgId, id)
+  if (!profile) throw new Error("Auth profile not found")
+
+  if (profile.activeLoginSessionId) {
+    await releaseBrowserbaseSession(profile.activeLoginSessionId)
+  }
+
+  const updated = await setAuthProfileLoginSession({
+    orgId,
+    id,
+    activeLoginSessionId: null,
+    markAuthenticated: true,
+  })
+
+  // Give Browserbase a moment to persist the context before the next run.
+  revalidatePath("/auth-profiles")
+  return updated
+}
+
+export async function cancelAuthProfileLoginAction(id: string) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  const profile = await getAuthProfile(orgId, id)
+  if (!profile) throw new Error("Auth profile not found")
+
+  if (profile.activeLoginSessionId) {
+    await releaseBrowserbaseSession(profile.activeLoginSessionId)
+  }
+
+  await setAuthProfileLoginSession({
+    orgId,
+    id,
+    activeLoginSessionId: null,
+  })
+
+  revalidatePath("/auth-profiles")
+}
+
+export async function deleteAuthProfileAction(id: string) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  const profile = await getAuthProfile(orgId, id)
+  if (!profile) throw new Error("Auth profile not found")
+
+  if (profile.activeLoginSessionId) {
+    await releaseBrowserbaseSession(profile.activeLoginSessionId)
+  }
+
+  const deleted = await deleteAuthProfile(orgId, id)
+  if (!deleted) throw new Error("Auth profile not found")
+
+  await deleteBrowserbaseContext(profile.browserbaseContextId).catch(() => undefined)
+
+  revalidatePath("/auth-profiles")
+  return deleted
+}
+
+export async function setWorkflowAuthProfileAction({
+  id,
+  authProfileId,
+}: {
+  id: string
+  authProfileId: string | null
+}) {
+  const { orgId } = await auth()
+  if (!orgId) throw new Error("No active organization")
+
+  if (authProfileId) {
+    const profile = await getAuthProfile(orgId, authProfileId)
+    if (!profile) throw new Error("Auth profile not found")
+  }
+
+  const workflow = await updateWorkflowAuthProfile({
+    orgId,
+    id,
+    authProfileId,
+  })
+  if (!workflow) throw new Error("Workflow not found")
+
+  revalidatePath(`/workflows/${id}`)
+  return { authProfileId: workflow.authProfileId }
 }

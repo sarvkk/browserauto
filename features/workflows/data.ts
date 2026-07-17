@@ -3,10 +3,12 @@ import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   WorkflowGraph,
+  authProfiles,
   orgSecrets,
   runArtifacts,
   workflowRuns,
   workflows,
+  type AuthProfile,
   type OrgSecret,
   type RunArtifact,
   type Workflow,
@@ -143,6 +145,24 @@ export async function updateWorkflowWebhookSecret({
   const [workflow] = await db
     .update(workflows)
     .set({ webhookSecret, updatedAt: new Date() })
+    .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
+    .returning()
+
+  return workflow
+}
+
+export async function updateWorkflowAuthProfile({
+  orgId,
+  id,
+  authProfileId,
+}: {
+  orgId: string
+  id: string
+  authProfileId: string | null
+}): Promise<Workflow | undefined> {
+  const [workflow] = await db
+    .update(workflows)
+    .set({ authProfileId, updatedAt: new Date() })
     .where(and(eq(workflows.id, id), eq(workflows.orgId, orgId)))
     .returning()
 
@@ -395,6 +415,94 @@ export async function getDecryptedOrgSecrets(
     result[row.name] = decryptSecret(row.encryptedValue)
   }
   return result
+}
+
+// ---------------------------------------------------------------------------
+// Auth profiles (Browserbase Context wrappers)
+// ---------------------------------------------------------------------------
+
+export function listAuthProfiles(orgId: string) {
+  return db
+    .select()
+    .from(authProfiles)
+    .where(eq(authProfiles.orgId, orgId))
+    .orderBy(authProfiles.name)
+}
+
+export async function getAuthProfile(orgId: string, id: string) {
+  const [profile] = await db
+    .select()
+    .from(authProfiles)
+    .where(and(eq(authProfiles.id, id), eq(authProfiles.orgId, orgId)))
+
+  return profile
+}
+
+export async function getAuthProfileByLoginSession(
+  orgId: string,
+  sessionId: string
+) {
+  const [profile] = await db
+    .select()
+    .from(authProfiles)
+    .where(
+      and(
+        eq(authProfiles.orgId, orgId),
+        eq(authProfiles.activeLoginSessionId, sessionId)
+      )
+    )
+
+  return profile
+}
+
+export async function createAuthProfile({
+  orgId,
+  name,
+  browserbaseContextId,
+}: {
+  orgId: string
+  name: string
+  browserbaseContextId: string
+}): Promise<AuthProfile> {
+  const [profile] = await db
+    .insert(authProfiles)
+    .values({ orgId, name, browserbaseContextId })
+    .returning()
+
+  return profile
+}
+
+export async function setAuthProfileLoginSession({
+  orgId,
+  id,
+  activeLoginSessionId,
+  markAuthenticated = false,
+}: {
+  orgId: string
+  id: string
+  activeLoginSessionId: string | null
+  markAuthenticated?: boolean
+}): Promise<AuthProfile | undefined> {
+  const [profile] = await db
+    .update(authProfiles)
+    .set({
+      activeLoginSessionId,
+      updatedAt: new Date(),
+      ...(markAuthenticated ? { lastAuthenticatedAt: new Date() } : {}),
+    })
+    .where(and(eq(authProfiles.id, id), eq(authProfiles.orgId, orgId)))
+    .returning()
+
+  return profile
+}
+
+export async function deleteAuthProfile(orgId: string, id: string) {
+  const [profile] = await db
+    .delete(authProfiles)
+    .where(and(eq(authProfiles.id, id), eq(authProfiles.orgId, orgId)))
+    .returning()
+
+  return profile
 }
 
 // ---------------------------------------------------------------------------

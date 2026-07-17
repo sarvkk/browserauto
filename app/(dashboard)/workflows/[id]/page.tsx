@@ -4,7 +4,11 @@ import { notFound } from "next/navigation"
 import { ReactFlowProvider } from "@xyflow/react"
 
 import { getLiveblocks } from "@/lib/liveblocks"
-import { getWorkflow, listWorkflowRuns } from "@/features/workflows/data"
+import {
+  getWorkflow,
+  listAuthProfiles,
+  listWorkflowRuns,
+} from "@/features/workflows/data"
 import { Room } from "@/features/workflows/components/room"
 import { WorkflowShell } from "@/features/workflows/components/workflow-shell"
 import { WorkflowRunsProvider } from "@/features/workflows/components/workflow-runs-provider"
@@ -21,7 +25,7 @@ export default async function Page({
   const workflow = await getWorkflow(orgId, id)
   if (!workflow) notFound()
 
-  const [runsToken, storedRuns] = await Promise.all([
+  const [runsToken, storedRuns, authProfiles] = await Promise.all([
     triggerAuth.createPublicToken({
       scopes: {
         read: {
@@ -31,6 +35,7 @@ export default async function Page({
       expirationTime: "1hr",
     }),
     listWorkflowRuns(orgId, id),
+    listAuthProfiles(orgId),
   ])
 
   const room = await getLiveblocks().upsertRoom(id, {
@@ -74,6 +79,11 @@ export default async function Page({
             initialGraph={workflow.graph}
             scheduleCron={workflow.scheduleCron}
             webhookSecret={workflow.webhookSecret}
+            authProfileId={workflow.authProfileId}
+            authProfiles={authProfiles.map((p) => ({
+              id: p.id,
+              name: p.name,
+            }))}
           />
         </WorkflowRunsProvider>
       </ReactFlowProvider>

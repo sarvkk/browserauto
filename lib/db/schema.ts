@@ -21,6 +21,31 @@ import type { StepNodeType } from "@/features/workflows/nodes/node-registry"
 // Run action; the live editing copy still lives in the Liveblocks room.
 export type WorkflowGraph = { nodes: StepNodeType[]; edges: Edge[] }
 
+// Org-scoped Browserbase Context wrappers — cookies/localStorage reused across
+// runs. The Context itself lives on Browserbase; we only store the id + metadata.
+export const authProfiles = pgTable(
+  "auth_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    name: text("name").notNull(),
+    browserbaseContextId: text("browserbase_context_id").notNull(),
+    // Keep-alive session used for Live View login/refresh; null when idle.
+    activeLoginSessionId: text("active_login_session_id"),
+    lastAuthenticatedAt: timestamp("last_authenticated_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("auth_profiles_org_name_idx").on(table.orgId, table.name),
+    index("auth_profiles_org_idx").on(table.orgId),
+    index("auth_profiles_login_session_idx").on(table.activeLoginSessionId),
+  ]
+)
+
+export type AuthProfile = typeof authProfiles.$inferSelect
+export type AuthProfileInsert = typeof authProfiles.$inferInsert
+
 export const workflows = pgTable("workflows", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: text("org_id").notNull(),
@@ -32,6 +57,10 @@ export const workflows = pgTable("workflows", {
   scheduleCron: text("schedule_cron"),
   // Shared secret for the webhook trigger URL; null when webhooks are off.
   webhookSecret: text("webhook_secret"),
+  // Default auth profile for runs (schedules/webhooks); overrideable on manual Run.
+  authProfileId: uuid("auth_profile_id").references(() => authProfiles.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

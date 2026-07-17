@@ -2,7 +2,10 @@ import * as Sentry from "@sentry/nextjs"
 import { auth } from "@clerk/nextjs/server"
 
 import { browserbase } from "@/lib/browserbase"
-import { getWorkflowRunBySession } from "@/features/workflows/data"
+import {
+  getAuthProfileByLoginSession,
+  getWorkflowRunBySession,
+} from "@/features/workflows/data"
 
 // Proxies a Browserbase live-view URL so the browser can embed it. The debug
 // endpoint needs the secret API key, so it can only happen server-side — the
@@ -25,9 +28,12 @@ export async function GET(
     sessionId,
   })
 
-  // Tenancy: only serve live views for sessions this org actually ran.
-  const ownedRun = await getWorkflowRunBySession(orgId, sessionId)
-  if (!ownedRun) {
+  // Tenancy: workflow runs or auth-profile login/refresh sessions for this org.
+  const [ownedRun, ownedProfile] = await Promise.all([
+    getWorkflowRunBySession(orgId, sessionId),
+    getAuthProfileByLoginSession(orgId, sessionId),
+  ])
+  if (!ownedRun && !ownedProfile) {
     Sentry.logger.warn("Live view denied — session not owned by org", {
       orgId,
       sessionId,
@@ -41,8 +47,9 @@ export async function GET(
   Sentry.logger.info("Live view URL served", {
     sessionId,
     orgId,
-    workflowId: ownedRun.workflowId,
-    runId: ownedRun.id,
+    workflowId: ownedRun?.workflowId,
+    runId: ownedRun?.id,
+    authProfileId: ownedProfile?.id,
   })
 
   return Response.json(

@@ -1,15 +1,52 @@
 import type { Stagehand } from "@browserbasehq/stagehand"
 import { z, type ZodTypeAny } from "zod"
 
+import { sleep } from "@/features/workflows/lib/self-heal"
+
 export async function extract({
   stagehand,
   instruction,
   schema,
+  retries = 0,
 }: {
   stagehand: Stagehand
   instruction: string
   schema?: string
+  retries?: number
 }) {
+  let lastError: Error | undefined
+  let healAttempts = 0
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        healAttempts++
+        await sleep(700 * attempt)
+        // Nudge the model toward a settled DOM before retrying extract.
+        await stagehand.observe(
+          "Find the main content area that has finished loading"
+        ).catch(() => undefined)
+      }
+
+      const result = await runExtract(stagehand, instruction, schema)
+      return {
+        ...result,
+        ...(healAttempts > 0 ? { healed: true, healAttempts } : {}),
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      if (attempt >= retries) break
+    }
+  }
+
+  throw lastError ?? new Error("Extract failed")
+}
+
+async function runExtract(
+  stagehand: Stagehand,
+  instruction: string,
+  schema?: string
+) {
   const zodSchema = schema?.trim()
     ? buildZodFromJsonShape(schema.trim())
     : undefined

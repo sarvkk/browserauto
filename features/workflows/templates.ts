@@ -7,6 +7,7 @@ export type WorkflowTemplateId =
   | "scrape-email"
   | "open-extract"
   | "branch-demo"
+  | "for-each-list"
 
 export type WorkflowTemplate = {
   id: WorkflowTemplateId
@@ -128,6 +129,50 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         edge("e3", "extract-1", "branch-1"),
         edge("e4", "branch-1", "email-true", "true"),
         edge("e5", "branch-1", "email-false", "false"),
+      ],
+    },
+  },
+  {
+    id: "for-each-list",
+    name: "List → For each",
+    description:
+      "Extract a list of links, then open each one and extract details.",
+    graph: {
+      nodes: [
+        node("start", "start", "Start", { x: 0, y: 160 }, {}, "trigger"),
+        node("open-list", "open-url", "Open list", { x: 240, y: 160 }, {
+          url: "https://news.ycombinator.com",
+        }),
+        node("extract-list", "extract", "Extract links", { x: 500, y: 160 }, {
+          instruction:
+            "Extract the first 3 story links as an array of objects with title and url",
+          schema:
+            '{ "stories": [{ "title": "string", "url": "string" }] }',
+          retries: "2",
+        }),
+        node("loop", "for-each", "For each story", { x: 780, y: 160 }, {
+          items: "{{ extract-list.extraction.stories }}",
+          maxItems: "3",
+        }),
+        node("open-item", "open-url", "Open story", { x: 1040, y: 40 }, {
+          url: "{{ loop.item.url }}",
+        }),
+        node("extract-item", "extract", "Extract detail", { x: 1300, y: 40 }, {
+          instruction: "Extract the page title",
+          schema: '{ "title": "string" }',
+          retries: "2",
+        }),
+        node("done-wait", "wait", "After loop", { x: 1040, y: 280 }, {
+          seconds: "1",
+        }),
+      ],
+      edges: [
+        edge("e1", "start", "open-list"),
+        edge("e2", "open-list", "extract-list"),
+        edge("e3", "extract-list", "loop"),
+        edge("e4", "loop", "open-item", "body"),
+        edge("e5", "open-item", "extract-item"),
+        edge("e6", "loop", "done-wait", "done"),
       ],
     },
   },

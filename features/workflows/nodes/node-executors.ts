@@ -4,6 +4,7 @@ import type {
   ActionNodeType,
   NodeType,
 } from "@/features/workflows/nodes/node-registry"
+import { parseRetries } from "@/features/workflows/lib/self-heal"
 import { act } from "./act"
 import { agent } from "./agent"
 import { branch } from "./branch"
@@ -25,16 +26,24 @@ export type NodeContext = {
 
 export type NodeExecutor = (ctx: NodeContext) => Promise<unknown>
 
+// for-each is control-flow — handled by the run task, not a leaf executor.
+type LeafActionNodeType = Exclude<ActionNodeType, "for-each">
+
 export const nodeExecutors: Partial<Record<NodeType, NodeExecutor>> = {
   "open-url": async ({ values, getStagehand }) =>
     openUrl({ stagehand: await getStagehand(), url: values.url }),
   act: async ({ values, getStagehand }) =>
-    act({ stagehand: await getStagehand(), instruction: values.instruction }),
+    act({
+      stagehand: await getStagehand(),
+      instruction: values.instruction,
+      retries: parseRetries(values.retries),
+    }),
   extract: async ({ values, getStagehand }) =>
     extract({
       stagehand: await getStagehand(),
       instruction: values.instruction,
       schema: values.schema,
+      retries: parseRetries(values.retries),
     }),
   observe: async ({ values, getStagehand }) =>
     observe({ stagehand: await getStagehand(), instruction: values.instruction }),
@@ -64,4 +73,4 @@ export const nodeExecutors: Partial<Record<NodeType, NodeExecutor>> = {
       runId,
       orgId,
     }),
-} satisfies Record<ActionNodeType, NodeExecutor>
+} satisfies Record<LeafActionNodeType, NodeExecutor>

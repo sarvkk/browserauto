@@ -10,6 +10,7 @@ import {
   MessageSquare,
   MousePointerClick,
   Pointer,
+  Repeat,
   ScanText,
   Send,
   type LucideIcon,
@@ -97,11 +98,24 @@ export const nodeRegistry = {
         multiline: true,
         required: true,
       },
+      {
+        key: "retries",
+        label: "Self-heal retries",
+        kind: "select",
+        options: [
+          { value: "0", label: "Off" },
+          { value: "1", label: "1 retry" },
+          { value: "2", label: "2 retries" },
+          { value: "3", label: "3 retries" },
+        ],
+      },
     ],
     outputs: [
       { path: "success", label: "Success" },
       { path: "message", label: "Message" },
       { path: "url", label: "URL" },
+      { path: "healed", label: "Healed" },
+      { path: "healAttempts", label: "Heal attempts" },
     ],
   },
   extract: {
@@ -124,8 +138,23 @@ export const nodeRegistry = {
         placeholder: '{ "price": "string", "items": ["string"] }',
         multiline: true,
       },
+      {
+        key: "retries",
+        label: "Self-heal retries",
+        kind: "select",
+        options: [
+          { value: "0", label: "Off" },
+          { value: "1", label: "1 retry" },
+          { value: "2", label: "2 retries" },
+          { value: "3", label: "3 retries" },
+        ],
+      },
     ],
-    outputs: [{ path: "extraction", label: "Extraction" }],
+    outputs: [
+      { path: "extraction", label: "Extraction" },
+      { path: "healed", label: "Healed" },
+      { path: "healAttempts", label: "Heal attempts" },
+    ],
   },
   observe: {
     type: "observe",
@@ -228,6 +257,37 @@ export const nodeRegistry = {
     sourceHandles: [
       { id: "true", label: "True" },
       { id: "false", label: "False" },
+    ],
+  },
+  "for-each": {
+    type: "for-each",
+    kind: "action",
+    label: "For each",
+    icon: Repeat,
+    accent: "bg-lime-600 text-white",
+    fields: [
+      {
+        key: "items",
+        label: "Items (JSON array)",
+        placeholder: '{{ extract-1.extraction.listings }}',
+        multiline: true,
+        required: true,
+      },
+      {
+        key: "maxItems",
+        label: "Max items",
+        placeholder: "25",
+      },
+    ],
+    outputs: [
+      { path: "item", label: "Current item" },
+      { path: "index", label: "Index" },
+      { path: "count", label: "Count" },
+      { path: "results", label: "Results" },
+    ],
+    sourceHandles: [
+      { id: "body", label: "Each" },
+      { id: "done", label: "Done" },
     ],
   },
   wait: {

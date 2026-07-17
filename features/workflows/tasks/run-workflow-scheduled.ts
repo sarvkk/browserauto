@@ -24,7 +24,11 @@ export const runWorkflowScheduledTask = schedules.task({
 
     await tasks.trigger<typeof runWorkflowTask>(
       "run-workflow",
-      { workflowId: workflow.id, orgId: workflow.orgId },
+      {
+        workflowId: workflow.id,
+        orgId: workflow.orgId,
+        trigger: { source: "schedule" },
+      },
       { tags: [`workflow:${workflow.id}`] }
     )
   },

@@ -1,5 +1,6 @@
 import toposort from "toposort"
 
+import { collectBodyOwnedNodeIds } from "@/features/workflows/lib/for-each"
 import type { WorkflowGraph } from "@/lib/db/schema"
 
 // Structural problems knowable before a run — empty array means runnable. Pure
@@ -22,6 +23,30 @@ export function validateGraph({ nodes, edges }: WorkflowGraph): string[] {
       toposort(edges.map((e) => [e.source, e.target]))
     } catch {
       problems.push("Workflow has a cycle — remove the loop before running.")
+    }
+  }
+
+  for (const node of nodes) {
+    if (node.data.type !== "for-each") continue
+    const hasBody = edges.some(
+      (e) => e.source === node.id && e.sourceHandle === "body"
+    )
+    if (!hasBody) {
+      problems.push(
+        `"${node.data.title}" needs at least one connection from its Each handle.`
+      )
+    }
+  }
+
+  // Done-path nodes must not also sit inside a for-each body (ambiguous ownership).
+  const bodyOwned = collectBodyOwnedNodeIds(edges)
+  for (const edge of edges) {
+    if (edge.sourceHandle !== "done") continue
+    if (bodyOwned.has(edge.target)) {
+      problems.push(
+        "A For each Done path can't reconnect into its Each body — keep Done separate."
+      )
+      break
     }
   }
 

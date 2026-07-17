@@ -1,7 +1,7 @@
 "use client"
 
 import { useTransition } from "react"
-import { Mail, GitBranch, ScanText } from "lucide-react"
+import { Mail, GitBranch, ScanText, Repeat } from "lucide-react"
 
 import {
   Empty,
@@ -38,6 +38,12 @@ const templates: {
     title: "Branch Demo",
     description: "Branch on extracted text and take different paths.",
     icon: <GitBranch className="size-5" />,
+  },
+  {
+    id: "for-each-list",
+    title: "List → For each",
+    description: "Loop over extracted links and scrape each page.",
+    icon: <Repeat className="size-5" />,
   },
 ]
 
@@ -99,7 +105,7 @@ export default function Page() {
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Templates
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {templates.map((template) => (
             <TemplateCard key={template.id} {...template} />
           ))}

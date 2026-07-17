@@ -66,6 +66,17 @@ export function useUpstreamConnections(): UpstreamConnection[] {
       label: `Secret · ${name}`,
     }))
 
-    return [...upstream, ...secrets]
+    const triggerTokens: UpstreamConnection[] = [
+      {
+        token: "{{ trigger.body }}",
+        label: "Trigger · body",
+      },
+      {
+        token: "{{ trigger.source }}",
+        label: "Trigger · source",
+      },
+    ]
+
+    return [...upstream, ...triggerTokens, ...secrets]
   }, [selected, nodes, edges, secretNames])
 }
