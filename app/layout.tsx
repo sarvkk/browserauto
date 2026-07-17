@@ -39,11 +39,20 @@ export const metadata: Metadata = {
     siteName: "Browserauto",
     title: siteTitle,
     description: siteDescription,
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Browserauto — Visual workflows that drive real browsers",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: siteTitle,
     description: siteDescription,
+    images: ["/og.png"],
   },
 }
 
